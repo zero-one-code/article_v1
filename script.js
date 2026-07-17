@@ -74,12 +74,22 @@ function getSafetyNavigationTop() {
     if (scene === null) {
         return SAFETY_PIN_BASE - 900;
     }
+
     const sceneTop = parseFloat(scene.dataset.absoluteTop || '0');
     const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
     const pinDuration = parseFloat(scene.dataset.pinDuration || '8600');
     const buildDuration = 5000;
     const outroDuration = Math.max(1, pinDuration - buildDuration);
-    return Math.max(0, sceneTop - pinOffset + buildDuration + (outroDuration * 0.64));
+
+    // Safety intro is revealed over outro progress 0.68–0.76.
+    // Land just before the following information card begins at 0.78,
+    // so the title and question are fully visible when the nav is clicked.
+    const safetyIntroTargetProgress = 0.755;
+
+    return Math.max(
+        0,
+        sceneTop - pinOffset + buildDuration + (outroDuration * safetyIntroTargetProgress)
+    );
 }
 
 function getDecisionNavigationTop() {
@@ -100,6 +110,10 @@ function getNavSectionTop(section) {
 }
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MOBILE_MIN_RENDERED_FONT_SIZE = 10;
+const MOBILE_CLOSING_MESSAGE_FONT_SIZE = 13;
+const MOBILE_SOURCE_TEXT_FONT_SIZE = 12;
+const MOBILE_SOURCE_TITLE_FONT_SIZE = 13;
 
 function isMobileLayout() {
     return window.matchMedia("(max-width: 900px), (pointer: coarse) and (max-width: 1180px)").matches;
@@ -351,8 +365,8 @@ function updateScale() {
     document.documentElement.classList.toggle("is-compact", compact);
 
     window.requestAnimationFrame(() => {
-        applyMobileFontFloor(compact);
         applyMobileLegendSizing(compact);
+        applyMobileFontFloor(compact);
     });
 }
 
@@ -420,7 +434,7 @@ function applyMobileLegendSizing(compact) {
         const renderedScale = Math.max(0.01, getCumulativeTransformScale(legend));
         const toDesignPixels = (physicalPixels) => `${(physicalPixels / renderedScale).toFixed(3)}px`;
 
-        legend.style.setProperty("font-size", toDesignPixels(9), "important");
+        legend.style.setProperty("font-size", toDesignPixels(11), "important");
         legend.style.setProperty("line-height", "1.28", "important");
         legend.style.setProperty("column-gap", toDesignPixels(14), "important");
         legend.style.setProperty("row-gap", toDesignPixels(10), "important");
@@ -447,7 +461,7 @@ function applyMobileFontFloor(compact) {
         return;
     }
 
-    const minimumRenderedFontSize = 9;
+    const minimumRenderedFontSize = MOBILE_MIN_RENDERED_FONT_SIZE;
     const candidates = document.querySelectorAll("body *:not(script):not(style):not(noscript)");
 
     candidates.forEach((element) => {
@@ -456,7 +470,7 @@ function applyMobileFontFloor(compact) {
         }
 
         const computed = window.getComputedStyle(element);
-        if (computed.display === "none" || computed.visibility === "hidden") {
+        if (computed.display === "none") {
             return;
         }
 
@@ -480,7 +494,7 @@ function applyMobileFontFloor(compact) {
             element.style.setProperty("line-height", "1.2", "important");
         }
 
-        element.setAttribute("data-mobile-font-floor", "9px");
+        element.setAttribute("data-mobile-font-floor", `${minimumRenderedFontSize}px`);
     });
 }
 
@@ -567,6 +581,7 @@ function addScrollButton(sectionName) {
     const button = makeElement("button", "scroll-button", "<span class=\"scroll-guide\">Keep scrolling as you read to follow the story.</span><span class=\"scroll-label\">Scroll Down</span><span class=\"scroll-arrow\" aria-hidden=\"true\">↓</span>");
     button.type = "button";
     button.id = "scrollButton";
+    button.setAttribute("aria-label", "Scroll to the disease burden section");
     return appendElement(sectionName, button, 750, 866, 420);
 }
 
@@ -2895,14 +2910,21 @@ function createEffectivenessRangePinLayer() {
     content.appendChild(compare);
 
     const compareLowerCard = makeEffectivenessRangePinnedCard(
-        'The most uncertainty range is lower in the vaccinated group at 14 to 19 cases per 1000 people, compared with 30 to 36 in the placebo group.',
+        'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases compared to the placebo group.',
         'effectiveness-range-pinned-card--compare-lower'
     );
     setBox(compareLowerCard, 464, 0, 993, 301);
     content.appendChild(compareLowerCard);
 
+    const compareMeanDifferenceCard = makeEffectivenessRangePinnedCard(
+        'The most likely range is lower in the vaccinated group at <span class="red">14</span> to <span class="red">19</span> cases per 1000 people, compared with <span class="red">30</span> to <span class="red">36</span> in the placebo group.',
+        'effectiveness-range-pinned-card--mean-difference'
+    );
+    setBox(compareMeanDifferenceCard, 464, 0, 993, 301);
+    content.appendChild(compareMeanDifferenceCard);
+
     const compareOverallCard = makeEffectivenessRangePinnedCard(
-        'Overall, this study shows that the herpes<br>zoster vaccine appears to reduce the risk<br>of developing it.',
+        'Overall, this study shows that the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
         'effectiveness-range-pinned-card--compare-overall'
     );
     setBox(compareOverallCard, 464, 0, 993, 301);
@@ -2973,6 +2995,7 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     const placeboCard = pinLayer.querySelector('.effectiveness-range-pinned-card--placebo');
     const vaccinatedCard = pinLayer.querySelector('.effectiveness-range-pinned-card--vaccinated');
     const compareLowerCard = pinLayer.querySelector('.effectiveness-range-pinned-card--compare-lower');
+    const compareMeanDifferenceCard = pinLayer.querySelector('.effectiveness-range-pinned-card--mean-difference');
     const compareOverallCard = pinLayer.querySelector('.effectiveness-range-pinned-card--compare-overall');
     const rangeCompare = pinLayer.querySelector('.effectiveness-range-pinned-compare');
     const safetyInfoCard = pinLayer.querySelector('.effectiveness-range-safety-info-card');
@@ -3221,19 +3244,24 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     }
 
     if (compareLowerCard !== null) {
-        setVaccineCardScrollPosition(compareLowerCard, clamp(outroProgress / 0.26, 0, 1), 1080, -470);
+        setVaccineCardScrollPosition(compareLowerCard, clamp(outroProgress / 0.24, 0, 1), 1080, -470);
         compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
     }
 
+    if (compareMeanDifferenceCard !== null) {
+        setVaccineCardScrollPosition(compareMeanDifferenceCard, clamp((outroProgress - 0.20) / 0.26, 0, 1), 1080, -470);
+        compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
+    }
+
     if (compareOverallCard !== null) {
-        setVaccineCardScrollPosition(compareOverallCard, clamp((outroProgress - 0.20) / 0.28, 0, 1), 1080, -470);
+        setVaccineCardScrollPosition(compareOverallCard, clamp((outroProgress - 0.42) / 0.26, 0, 1), 1080, -470);
         compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
     }
 
     const safetyIntro = pinLayer.querySelector('.effectiveness-range-safety-intro');
     if (safetyIntro !== null) {
-        const introReveal = smoothStep(0.50, 0.60, outroProgress);
-        const introFadeOut = 1 - smoothStep(0.90, 0.99, outroProgress);
+        const introReveal = smoothStep(0.68, 0.76, outroProgress);
+        const introFadeOut = 1 - smoothStep(0.92, 0.99, outroProgress);
         const introOpacity = layerOpacity * Math.min(introReveal, introFadeOut);
         safetyIntro.style.opacity = introOpacity.toFixed(3);
         safetyIntro.style.visibility = introOpacity > 0.02 ? 'visible' : 'hidden';
@@ -3241,12 +3269,12 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     }
 
     if (safetyInfoCard !== null) {
-        const infoProgress = clamp((outroProgress - 0.70) / 0.28, 0, 1);
+        const infoProgress = clamp((outroProgress - 0.78) / 0.20, 0, 1);
         setOpaqueSpeechCardScrollPosition(safetyInfoCard, infoProgress, 1080, -470);
     }
 
     if (safetyFirstChart !== null) {
-        const chartReveal = smoothStep(0.90, 1.0, outroProgress);
+        const chartReveal = smoothStep(0.92, 1.0, outroProgress);
         const chartOpacity = chartReveal;
         safetyFirstChart.style.opacity = chartOpacity.toFixed(3);
         safetyFirstChart.style.visibility = chartOpacity > 0.02 ? 'visible' : 'hidden';
@@ -3321,7 +3349,13 @@ function scrollToBurden() {
         const scale = getScale();
         const sceneTop = parseFloat(scene.dataset.absoluteTop || "0");
         const pinOffset = parseFloat(scene.dataset.pinOffset || "0");
-        window.scrollTo({ top: (sceneTop - pinOffset) * scale, behavior: prefersReducedMotion ? "auto" : "smooth" });
+        const targetDesignY = Math.max(0, sceneTop - pinOffset);
+        scrollState.targetDesignY = targetDesignY;
+        if (prefersReducedMotion) {
+            scrollState.currentDesignY = targetDesignY;
+        }
+        window.scrollTo({ top: targetDesignY * scale, behavior: prefersReducedMotion ? "auto" : "smooth" });
+        requestScrollSceneFrame();
     }
 }
 
@@ -3423,7 +3457,7 @@ function renderSafety() {
         }
     });
     addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 35984);
-    addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20 to 24</span> cases<br>in the placebo group and <span class=\"purple\">21 to 26</span> cases<br>in the vaccinated group", 36345);
+    addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 36345);
     addCard("safety", "Overall, the study shows no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.", 36706);
 }
 
@@ -3732,7 +3766,7 @@ const SAFETY_SCENE_DEFS = [
         },
         bubbles: [
             'For every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event compared to the placebo group.',
-            'The likely ranges overlapped and were close<br>to each other, at <span class="purple">20 to 24</span> cases<br>in the placebo group and <span class="purple">21 to 26</span> cases<br>in the vaccinated group',
+            'The likely ranges overlapped and were close<br>to each other, at <span class="purple">20</span> to <span class="purple">24</span> cases<br>in the placebo group and <span class="purple">21</span> to <span class="purple">26</span> cases<br>in the vaccinated group',
             'Overall, the study shows no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.'
         ]
     },
@@ -3751,7 +3785,12 @@ const SAFETY_SCENE_DEFS = [
         ]
     },
     {
-        id: 'sfa-7', kind: 'closing', bubbleStart: 0,
+        id: 'sfa-7', kind: 'closing',
+        // Start this scene before the previous bubble scene fully ends.
+        // This removes the empty-scroll gap: as the decision bubble exits
+        // through the top, the next bubble immediately enters from below.
+        overlapBefore: 650,
+        bubbleStart: 0,
         revealDist: 1800,
         bgStart: 300,
         bubbleSpacing: 1900,
@@ -3927,6 +3966,7 @@ function buildPinnedPageLayer(def) {
                 link.href = source.url;
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
+                link.setAttribute('aria-label', `${source.label} (opens in a new tab)`);
                 item.appendChild(link);
                 list.appendChild(item);
             });
@@ -4317,10 +4357,39 @@ function applyResponsiveCardSizing() {
         });
     });
 
+    const introScrollButton = document.getElementById("scrollButton");
+    if (introScrollButton !== null) {
+        if (compact) {
+            const buttonScale = Math.max(0.01, getCumulativeTransformScale(introScrollButton));
+            introScrollButton.style.setProperty("min-height", `${Math.ceil(48 / buttonScale)}px`, "important");
+            introScrollButton.style.setProperty("min-width", `${Math.ceil(160 / buttonScale)}px`, "important");
+            introScrollButton.style.setProperty("padding", `${Math.ceil(10 / buttonScale)}px ${Math.ceil(14 / buttonScale)}px`, "important");
+        } else {
+            introScrollButton.style.removeProperty("min-height");
+            introScrollButton.style.removeProperty("min-width");
+            introScrollButton.style.removeProperty("padding");
+        }
+    }
+
+    document.querySelectorAll('.final-message').forEach((message) => {
+        if (compact) {
+            const messageScale = Math.max(0.01, getCumulativeTransformScale(message));
+            message.style.setProperty(
+                'font-size',
+                `${(MOBILE_CLOSING_MESSAGE_FONT_SIZE / messageScale).toFixed(3)}px`,
+                'important'
+            );
+            message.style.setProperty('line-height', '1.25', 'important');
+        } else {
+            message.style.removeProperty('font-size');
+            message.style.removeProperty('line-height');
+        }
+    });
+
     const dataSources = document.querySelector('.data-sources');
     if (dataSources !== null) {
-        const sourcePhysicalFont = compact ? 7 : 18;
-        const sourcePhysicalTitle = compact ? 8 : 20;
+        const sourcePhysicalFont = compact ? MOBILE_SOURCE_TEXT_FONT_SIZE : 18;
+        const sourcePhysicalTitle = compact ? MOBILE_SOURCE_TITLE_FONT_SIZE : 20;
         dataSources.style.fontSize = compact
             ? Math.round(sourcePhysicalFont / pinScale) + 'px'
             : sourcePhysicalFont + 'px';
@@ -4330,6 +4399,24 @@ function applyResponsiveCardSizing() {
                 ? Math.round(sourcePhysicalTitle / pinScale) + 'px'
                 : sourcePhysicalTitle + 'px';
         }
+
+        dataSources.querySelectorAll('a').forEach((link) => {
+            if (compact) {
+                link.style.display = 'inline-flex';
+                link.style.alignItems = 'center';
+                link.style.justifyContent = 'center';
+                link.style.minHeight = Math.ceil(44 / pinScale) + 'px';
+                link.style.padding = `0 ${Math.ceil(6 / pinScale)}px`;
+                link.style.lineHeight = '1.35';
+            } else {
+                link.style.removeProperty('display');
+                link.style.removeProperty('align-items');
+                link.style.removeProperty('justify-content');
+                link.style.removeProperty('min-height');
+                link.style.removeProperty('padding');
+                link.style.removeProperty('line-height');
+            }
+        });
     }
 }
 
@@ -4351,45 +4438,58 @@ function renderArticle() {
 
     window.requestAnimationFrame(() => {
         const compact = isMobileLayout();
-        applyMobileFontFloor(compact);
         applyMobileLegendSizing(compact);
+        applyMobileFontFloor(compact);
     });
 }
 
-window.addEventListener("resize", function () {
-    updateScale();
-    document.querySelectorAll(".dot-plot, .mini-dot-plot").forEach(function (plot) {
-        delete plot.dataset.cachedWidth;
-        delete plot.dataset.cachedHeight;
-    });
-    applyResponsiveCardSizing();
-    syncScrollStateToWindow(true);
-    updateScrollDrivenScenes(getAnimatedDesignY());
-    if (storyScroller !== null) {
-        storyScroller.resize();
+let layoutRefreshRafId = null;
+let resetPlotCacheOnRefresh = false;
+
+function scheduleResponsiveRefresh(resetPlotCache) {
+    resetPlotCacheOnRefresh = resetPlotCacheOnRefresh || Boolean(resetPlotCache);
+
+    if (layoutRefreshRafId !== null) {
+        return;
     }
-});
-if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", function () {
-        updateScale();
-        applyResponsiveCardSizing();
-        if (storyScroller !== null) {
-            storyScroller.resize();
-        }
-    }, { passive: true });
-}
 
-window.addEventListener("orientationchange", function () {
-    window.setTimeout(function () {
+    layoutRefreshRafId = window.requestAnimationFrame(() => {
+        layoutRefreshRafId = null;
         updateScale();
+
+        if (resetPlotCacheOnRefresh) {
+            document.querySelectorAll(".dot-plot, .mini-dot-plot").forEach((plot) => {
+                delete plot.dataset.cachedWidth;
+                delete plot.dataset.cachedHeight;
+            });
+        }
+        resetPlotCacheOnRefresh = false;
+
         applyResponsiveCardSizing();
         syncScrollStateToWindow(true);
         updateScrollDrivenScenes(getAnimatedDesignY());
+
         if (storyScroller !== null) {
             storyScroller.resize();
         }
+    });
+}
+
+window.addEventListener("resize", () => {
+    scheduleResponsiveRefresh(true);
+}, { passive: true });
+
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+        scheduleResponsiveRefresh(false);
+    }, { passive: true });
+}
+
+window.addEventListener("orientationchange", () => {
+    window.setTimeout(() => {
+        scheduleResponsiveRefresh(true);
     }, 120);
-});
+}, { passive: true });
 
 window.addEventListener("load", function () {
     updateScale();
