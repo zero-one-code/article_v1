@@ -329,7 +329,7 @@ function updateScale() {
     );
 
     if (compact) {
-        const cardPhysicalTop = clamp(viewportHeight * 0.22, 145, 190);
+        const cardPhysicalTop = clamp(viewportHeight * 0.18, 120, 160);
         const centeredGraphicY = viewportHeight * 0.50;
         const designTopForCard = (cardPhysicalTop - pinOffsetY) / Math.max(0.01, pinScale);
         const designTopForStage = (stageHeight) => (
