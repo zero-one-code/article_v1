@@ -35,7 +35,7 @@ const navSections = [
     {
         key: "disease",
         label: "Disease burden",
-        getTop: () => getSceneNavigationTop(".disease-scrolly", 0)
+        getTop: () => getDiseaseNavigationTop()
     },
     {
         key: "effectiveness",
@@ -69,6 +69,11 @@ function getSceneNavigationTop(selector, visibleOffset) {
     return Math.max(0, sceneTop - pinOffset + (visibleOffset || 0));
 }
 
+function getDiseaseNavigationTop() {
+    const visibleOffset = isMobileLayout() ? 80 : 0;
+    return getSceneNavigationTop(".disease-scrolly", visibleOffset);
+}
+
 function getSafetyNavigationTop() {
     const scene = document.querySelector('.effectiveness-range-scrolly');
     if (scene === null) {
@@ -80,10 +85,6 @@ function getSafetyNavigationTop() {
     const pinDuration = parseFloat(scene.dataset.pinDuration || '8600');
     const buildDuration = 5000;
     const outroDuration = Math.max(1, pinDuration - buildDuration);
-
-    // Safety intro is revealed over outro progress 0.68–0.76.
-    // Land just before the following information card begins at 0.78,
-    // so the title and question are fully visible when the nav is clicked.
     const safetyIntroTargetProgress = 0.755;
 
     return Math.max(
@@ -3347,9 +3348,7 @@ function scrollToBurden() {
 
     if (scene !== null) {
         const scale = getScale();
-        const sceneTop = parseFloat(scene.dataset.absoluteTop || "0");
-        const pinOffset = parseFloat(scene.dataset.pinOffset || "0");
-        const targetDesignY = Math.max(0, sceneTop - pinOffset);
+        const targetDesignY = getDiseaseNavigationTop();
         scrollState.targetDesignY = targetDesignY;
         if (prefersReducedMotion) {
             scrollState.currentDesignY = targetDesignY;
@@ -3786,9 +3785,6 @@ const SAFETY_SCENE_DEFS = [
     },
     {
         id: 'sfa-7', kind: 'closing',
-        // Start this scene before the previous bubble scene fully ends.
-        // This removes the empty-scroll gap: as the decision bubble exits
-        // through the top, the next bubble immediately enters from below.
         overlapBefore: 650,
         bubbleStart: 0,
         revealDist: 1800,
