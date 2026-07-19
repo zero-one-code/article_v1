@@ -3407,7 +3407,7 @@ function renderSafety() {
         hasRange: false
     });
     addCard("safety", "The study shows that<br>about <span class=\"purple\">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.", 30695);
-    addCard("safety", "But how about uncertainty in the study data?", 31426);
+    addCard("safety", "What is the estimated uncertainty range for serious adverse events in the study data?", 31426);
 
     addChart("safety", {
         top: 31888,
