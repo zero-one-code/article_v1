@@ -2522,8 +2522,8 @@ function createUncertaintyConceptPinLayer() {
 
     const cardCopy = [
         "A study observes a <span class=\"blue\">sample</span> of people who take part in the study, not the entire population.",
-        "A different but comparable sample could produce a slightly different estimate.<br>This natural sample-to-sample variation is one source of <span class=\"blue\">uncertainty</span>.",
-        "The dot is the study’s <span class=\"blue\">point estimate</span>, which is a single value calculated from the data. The line shows values reasonably compatible with the data.<br>This range is a <span class=\"blue\">95% confidence interval</span>.",
+        "Therefore, the estimate could vary if different people had taken part, or if the same type of study was carried out again. This variation is one source of <span class=\"blue\">data uncertainty</span>.",
+        "Here a dot is the study’s <span class=\"blue\">point estimate</span>, which is a single value calculated from the data. The line shows the range of values reasonably compatible with the data.<br>This range is a <span class=\"blue\">95% confidence interval</span>.",
         "The interval makes uncertainty visible.<br>A narrower range means a more precise estimate;<br>a wider range means the exact value is less certain.",
         "For the charts that follow, compare the <span class=\"blue\">full range</span><br>with the placebo result.",
         "If the whole range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
