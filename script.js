@@ -2523,10 +2523,10 @@ function createUncertaintyConceptPinLayer() {
     const cardCopy = [
         "In general, studies are carried out on a <span class=\"blue\">sample</span> of subjects rather than the entire population. One single value is calculated from a sample to estimate a value for the whole population.",
         "Therefore, the estimate of the study could vary if different people had taken part, or if the same type of study is carried out again. This variation is one source of <span class=\"blue\">uncertainty in data</span>.",
-        "Here a dot is the study’s <span class=\"blue\">estimate</span>, which is a single value calculated from a sample data. The line shows a range of values which likely contains the true population mean, which is a <span class=\"blue\">confidence interval</span>.",
+        "Here a dot is an <span class=\"blue\">estimate</span> in a study, which is a value calculated from a sample data. The line shows a range of values that likely contains the true population mean, which is a <span class=\"blue\">confidence interval</span>.",
         "The interval makes uncertainty visible.<br>A narrower range means a more certain estimate, and <br>a wider range means the exact value is less certain.",
-        "For the charts that follow, compare the <span class=\"blue\">full range</span><br>with the placebo result.",
-        "If the whole range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
+        "For the charts that follow, compare the <span class=\"blue\">whole range</span><br>with the placebo result.",
+        "If the range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
         "If the range spans the placebo result,<br>the data also allow little or no difference.",
         "So, what uncertainty ranges<br>did this study report?"
     ];
