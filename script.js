@@ -2521,11 +2521,11 @@ function createUncertaintyConceptPinLayer() {
     content.appendChild(visual);
 
     const cardCopy = [
-        "In general, studies are carried out on a <span class=\"blue\">sample</span> of subjects rather than the entire population, which calculate one estimate using the sample.",
+        "In general, studies use a <span class=\"blue\">sample</span> of people rather than the entire population. The sample data are used to calculate an estimate of a population value.",
         "However, the estimate of the study could vary if different people had taken part, or if the same type of study is carried out again. This variation is one source of <span class=\"blue\">uncertainty in study data</span>.",
-        "Here a red dot is an estimate in a study. The grey line behind the dot shows a range of values, called a <span class=\"blue\">confidence interval</span>, which likely contains the true population value.",
-        "The interval makes uncertainty visible.<br>A narrower range means a more certain estimate, and <br>a wider range means the exact value is less certain.",
-        "For the charts that follow, compare the <span class=\"blue\">whole range</span><br>with the placebo result.",
+        "Here, the red dot shows the study’s estimate. The grey line behind the dot is a <span class=\"blue\">confidence interval</span>, showing a range of values which likely contains the true population value.",
+        "The estimated range of values helps make statistical uncertainty visible.<br>A narrower range means a more certain estimate, and <br>a wider interval indicates less precision.",
+        "For the charts that follow, consider the whole confidence interval for the difference between the vaccination and placebo groups.",
         "If the range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
         "If the range spans the placebo result,<br>the data also allow little or no difference.",
         "So, what uncertainty ranges<br>did this study report?"
