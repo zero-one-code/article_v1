@@ -100,7 +100,7 @@ body {
 }
 
 .main-title {
-    font-size: 77px;
+    font-size: 66px;
     line-height: 1.16;
     letter-spacing: -1px;
 }
@@ -497,7 +497,7 @@ body {
     width: 1920px;
     height: 1080px;
     overflow: visible;
-    transform: translateX(-50%) scale(var(--scale));
+    transform: translateX(-50%) scale(var(--pin-scale));
     transform-origin: top center;
     opacity: 0;
     contain: layout style;
@@ -506,7 +506,7 @@ body {
 }
 
 .disease-title {
-    font-size: 58px;
+    font-size: 51px;
     z-index: 2;
 }
 
