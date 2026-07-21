@@ -100,7 +100,7 @@ body {
 }
 
 .main-title {
-    font-size: 66px;
+    font-size: 77px;
     line-height: 1.16;
     letter-spacing: -1px;
 }
@@ -497,7 +497,7 @@ body {
     width: 1920px;
     height: 1080px;
     overflow: visible;
-    transform: translateX(-50%) scale(var(--pin-scale));
+    transform: translateX(-50%) scale(var(--scale));
     transform-origin: top center;
     opacity: 0;
     contain: layout style;
@@ -5007,4 +5007,14 @@ button {
     .progress-dot span {
         right: 22px;
     }
+}
+
+.canvas .main-title {
+    font-size: 77px !important;
+}
+
+.mobile-hero-content .main-title {
+    font-size: var(--hero-title-font-size, 77px) !important;
+    line-height: 1.16 !important;
+    letter-spacing: -1px !important;
 }
