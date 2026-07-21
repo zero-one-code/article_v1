@@ -304,6 +304,8 @@ function updateScale() {
     document.documentElement.style.setProperty("--viewport-width", `${viewportWidth.toFixed(2)}px`);
     document.documentElement.style.setProperty("--viewport-height", `${viewportHeight.toFixed(2)}px`);
 
+    // Match the fixed/mobile hero title's rendered size to the title in the
+    // normal scaled canvas. The two layers use different parent scales.
     const heroTitleFontSize = 77 * stageScale / Math.max(0.01, pinScale);
     document.documentElement.style.setProperty(
         "--hero-title-font-size",
