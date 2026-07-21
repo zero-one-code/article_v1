@@ -1004,7 +1004,7 @@ function createDiseasePinLayer() {
     }
 
     const layer = makeElement("div", "disease-pin-layer");
-    const content = makeDiseaseDiagramContent("disease-pin-content", 160, 300, true);
+    const content = makeDiseaseDiagramContent("disease-pin-content", 160, 220, true);
     layer.appendChild(content);
     document.body.appendChild(layer);
     return layer;
@@ -1022,7 +1022,7 @@ function addDiseaseScrollScene(sectionName, absoluteTop) {
     scene.dataset.pinDuration = String(pinDuration);
     scene.dataset.transitionOutStart = String(transitionOutStart);
 
-    const staticLayer = makeDiseaseDiagramContent("disease-static-layer", 10, 150, false);
+    const staticLayer = makeDiseaseDiagramContent("disease-static-layer", 10, 70, false);
     scene.appendChild(staticLayer);
 
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
@@ -1137,7 +1137,7 @@ function createRiskPinLayer() {
     }
 
     const layer = makeElement("div", "risk-pin-layer");
-    const content = makeRiskGroupContent("risk-pin-content", 72, 194, true);
+    const content = makeRiskGroupContent("risk-pin-content", 72, 124, true);
     layer.appendChild(content);
     document.body.appendChild(layer);
     return layer;
@@ -1155,7 +1155,7 @@ function addRiskScrollScene(sectionName, absoluteTop) {
     scene.dataset.pinDuration = String(pinDuration);
     scene.dataset.transitionOutStart = String(transitionOutStart);
 
-    const staticLayer = makeRiskGroupContent("risk-static-layer", 72, 194, false);
+    const staticLayer = makeRiskGroupContent("risk-static-layer", 72, 124, false);
     scene.appendChild(staticLayer);
 
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
