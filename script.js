@@ -7,13 +7,17 @@ const dotSize = 12;
 const sectionTops = {
     intro: 0,
     effectiveness: 7150,
-    safety: 22250,
-    closing: 36900
+    uncertainty: 12300,
+    effectivenessRange: 19450,
+    safety: 24500,
+    closing: 37300
 };
 
 const sections = {
     intro: document.getElementById("section-intro"),
     effectiveness: document.getElementById("section-effectiveness"),
+    uncertainty: document.getElementById("section-uncertainty"),
+    effectivenessRange: document.getElementById("section-effectiveness-range"),
     safety: document.getElementById("section-safety"),
     closing: document.getElementById("section-closing")
 };
@@ -21,6 +25,8 @@ const sections = {
 const sectionLabels = {
     intro: "Intro",
     effectiveness: "Effectiveness",
+    uncertainty: "Uncertainty",
+    effectivenessRange: "Uncertainty Range",
     safety: "Safety",
     closing: "Closing"
 };
@@ -35,6 +41,11 @@ const navSections = [
         key: "effectiveness",
         label: "Effectiveness",
         getTop: () => getSceneNavigationTop(".effectiveness-scrolly", 520)
+    },
+    {
+        key: "uncertainty",
+        label: "Uncertainty",
+        getTop: () => getSceneNavigationTop(".reliability-scrolly", 260)
     },
     {
         key: "safety",
@@ -64,14 +75,22 @@ function getDiseaseNavigationTop() {
 }
 
 function getSafetyNavigationTop() {
-    const safetyIntro = typeof SAFETY_SCENE_DEFS !== "undefined"
-        ? SAFETY_SCENE_DEFS.find((def) => def.id === "safety-intro")
-        : null;
-    if (safetyIntro && Number.isFinite(safetyIntro._top)) {
-        const fullyVisibleOffset = Math.max(900, (Number(safetyIntro.revealDist) || 1500) * 0.60);
-        return safetyIntro._top + fullyVisibleOffset;
+    const scene = document.querySelector('.effectiveness-range-scrolly');
+    if (scene === null) {
+        return SAFETY_PIN_BASE - 900;
     }
-    return Number(sectionTops.safety) || SAFETY_PIN_BASE;
+
+    const sceneTop = parseFloat(scene.dataset.absoluteTop || '0');
+    const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
+    const pinDuration = parseFloat(scene.dataset.pinDuration || '8600');
+    const buildDuration = 5000;
+    const outroDuration = Math.max(1, pinDuration - buildDuration);
+    const safetyIntroTargetProgress = 0.755;
+
+    return Math.max(
+        0,
+        sceneTop - pinOffset + buildDuration + (outroDuration * safetyIntroTargetProgress)
+    );
 }
 
 function getDecisionNavigationTop() {
@@ -156,6 +175,9 @@ function updateScrollDrivenScenes(currentDesignY) {
     updateRiskScrolly(currentDesignY);
     updateVaccinationScrolly(currentDesignY);
     updateEffectivenessScrolly(currentDesignY);
+    updateReliabilityScrolly(currentDesignY);
+    updateUncertaintyConceptScrolly(currentDesignY);
+    updateEffectivenessRangeScrolly(currentDesignY);
     updatePinnedPages(currentDesignY);
 }
 
@@ -282,6 +304,65 @@ function updateScale() {
     document.documentElement.style.setProperty("--viewport-width", `${viewportWidth.toFixed(2)}px`);
     document.documentElement.style.setProperty("--viewport-height", `${viewportHeight.toFixed(2)}px`);
 
+    const uncertaintyGraphicScale = compact ? 1.32 : 1;
+    const uncertaintyRenderedScale = Math.max(0.01, pinScale * uncertaintyGraphicScale);
+    const uncertaintyGraphicFont = 12 / uncertaintyRenderedScale;
+    document.documentElement.style.setProperty(
+        "--uncertainty-mobile-graphic-font-size",
+        `${uncertaintyGraphicFont.toFixed(3)}px`
+    );
+    document.documentElement.style.setProperty(
+        "--uncertainty-mobile-small-font-size",
+        `${(10 / uncertaintyRenderedScale).toFixed(3)}px`
+    );
+    document.documentElement.style.setProperty(
+        "--uncertainty-mobile-card-font-size",
+        `${(12 / Math.max(0.01, pinScale)).toFixed(3)}px`
+    );
+    document.documentElement.style.setProperty(
+        "--uncertainty-mobile-note-font-size",
+        `${uncertaintyGraphicFont.toFixed(3)}px`
+    );
+    document.documentElement.style.setProperty(
+        "--uncertainty-mobile-note-gap",
+        `${(10 / uncertaintyRenderedScale).toFixed(3)}px`
+    );
+
+    if (compact) {
+        const cardPhysicalTop = clamp(viewportHeight * 0.18, 120, 160);
+        const centeredGraphicY = viewportHeight * 0.50;
+        const designTopForCard = (cardPhysicalTop - pinOffsetY) / Math.max(0.01, pinScale);
+        const designTopForStage = (stageHeight) => (
+            centeredGraphicY
+            - pinOffsetY
+            - ((stageHeight * uncertaintyRenderedScale) / 2)
+        ) / Math.max(0.01, pinScale);
+
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-card-top",
+            `${designTopForCard.toFixed(2)}px`
+        );
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-source-top",
+            `${designTopForStage(440).toFixed(2)}px`
+        );
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-variation-top",
+            `${designTopForStage(620).toFixed(2)}px`
+        );
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-interval-top",
+            `${designTopForStage(500).toFixed(2)}px`
+        );
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-precision-top",
+            `${designTopForStage(480).toFixed(2)}px`
+        );
+        document.documentElement.style.setProperty(
+            "--uncertainty-mobile-interpretation-top",
+            `${designTopForStage(520).toFixed(2)}px`
+        );
+    }
     document.documentElement.classList.toggle("is-compact", compact);
 
     window.requestAnimationFrame(() => {
@@ -587,7 +668,7 @@ function makeRangeBar(plot, start, end, mean, colour) {
     const meanHighlight = document.createElement("img");
     meanHighlight.className = "range-mean-highlight";
     meanHighlight.src = "./assets/" + getMeanImageFile(colour, "plot");
-    meanHighlight.alt = "Mean value marker";
+    meanHighlight.alt = "Mean value in the uncertainty range";
     meanHighlight.style.left = meanLeft + "px";
     plot.appendChild(meanHighlight);
 }
@@ -699,12 +780,12 @@ function makeLegend(colour, label, hasRange) {
         const mean = document.createElement("img");
         mean.className = "range-swatch-mean";
         mean.src = "./assets/" + getMeanImageFile(colour, "legend");
-        mean.alt = "Mean value marker";
+        mean.alt = "Mean value in the uncertainty range";
 
         const rangeText = makeElement(
             "span",
             "legend-text",
-            "Range, with the strongest colour indicating the mean value"
+            "Uncertainty range, with the strongest colour indicating the mean value"
         );
 
         range.appendChild(mean);
@@ -2180,6 +2261,1029 @@ function updateEffectivenessScrolly(currentDesignY) {
 }
 
 
+function makeReliabilityCard() {
+    const card = makeElement("section", "text-card reliability-card");
+    card.appendChild(makeElement("p", "", "A single estimate is useful,<br>but it is not the whole answer."));
+    card.setAttribute("aria-hidden", "true");
+    return card;
+}
+
+function createReliabilityPinLayer() {
+    const existingLayer = document.querySelector(".reliability-pin-layer");
+
+    if (existingLayer !== null) {
+        return existingLayer;
+    }
+
+    const layer = makeElement("div", "reliability-pin-layer");
+    const content = makeElement("div", "reliability-pin-content");
+
+    const title = makeElement("h2", "title question-title reliability-title", "How certain are the numbers<br>reported by this study?");
+    setBox(title, 500, 500, 920);
+    content.appendChild(title);
+
+    const card = makeReliabilityCard();
+    content.appendChild(card);
+
+    layer.appendChild(content);
+    document.body.appendChild(layer);
+    return layer;
+}
+
+function addReliabilityScrollScene(sectionName, absoluteTop) {
+    const sceneHeight = 1150;
+    const pinOffset = 0;
+    const pinDuration = 1150;
+    const scene = makeElement("div", "reliability-scrolly");
+    scene.dataset.absoluteTop = String(absoluteTop);
+    scene.dataset.sceneHeight = String(sceneHeight);
+    scene.dataset.pinOffset = String(pinOffset);
+    scene.dataset.pinDuration = String(pinDuration);
+
+    appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
+    createReliabilityPinLayer();
+    return scene;
+}
+
+function updateReliabilityScrolly(currentDesignY) {
+    const scene = document.querySelector(".reliability-scrolly");
+    const pinLayer = document.querySelector(".reliability-pin-layer");
+
+    if (scene === null || pinLayer === null) {
+        return;
+    }
+
+    const scale = getScale();
+    const sceneTop = parseFloat(scene.dataset.absoluteTop || "0");
+    const pinOffset = parseFloat(scene.dataset.pinOffset || "0");
+    const pinDuration = parseFloat(scene.dataset.pinDuration || "1");
+    currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
+    const pinStart = sceneTop - pinOffset;
+    const pinEnd = pinStart + pinDuration;
+    const progress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
+    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
+    const content = pinLayer.querySelector(".reliability-pin-content");
+    const title = pinLayer.querySelector(".reliability-title");
+    const card = pinLayer.querySelector(".reliability-card");
+    const cardProgress = 0;
+    const cardHasLeft = false;
+    const layerReveal = smoothStep(0.0, 0.16, progress);
+    const layerFade = 1 - smoothStep(0.82, 1.0, progress);
+    const layerOpacity = isPinned ? Math.min(layerReveal, layerFade) : 0;
+
+    pinLayer.classList.toggle("is-active", isPinned);
+    pinLayer.style.opacity = layerOpacity.toFixed(3);
+
+    if (content !== null) {
+        content.style.top = `${Math.round(getPinOffsetY())}px`;
+        content.style.opacity = "1";
+    }
+
+    if (title !== null) {
+        const titleFade = 1 - smoothStep(0.90, 1.0, progress);
+        title.style.transform = "translate3d(0, 0, 0)";
+        title.style.opacity = (cardHasLeft ? titleFade : 1).toFixed(3);
+    }
+
+    if (card !== null) {
+        card.style.opacity = "0";
+        card.style.visibility = "hidden";
+        card.style.transform = "translate3d(0, 1080px, 0)";
+    }
+}
+
+function makeConceptPeopleCluster(count, className) {
+    const cluster = makeElement("div", `uncertainty-concept-people ${className || ""}`.trim());
+    const maleSvgMarkup = `<svg class="uncertainty-concept-person-svg" viewBox="0 0 25 60" aria-hidden="true" focusable="false"><path d="M12.3835 9.95947C15.1337 9.95947 17.3632 7.72997 17.3632 4.97973C17.3632 2.2295 15.1337 0 12.3835 0C9.63329 0 7.40381 2.2295 7.40381 4.97973C7.40381 7.72997 9.63329 9.95947 12.3835 9.95947Z" fill="currentColor"></path><path d="M18.6738 11.3164H6.22461C2.75193 11.3164 0 14.0684 0 17.5411V32.7424C0 33.9218 0.982835 34.9701 2.22776 34.9701C3.47268 34.9701 4.45551 33.9873 4.45551 32.7424V18.786C4.45551 18.4584 4.7176 18.1963 5.04521 18.1963C5.37282 18.1963 5.63491 18.4584 5.63491 18.786V56.5271C5.63491 58.3618 7.01088 59.9343 8.71446 59.9343C10.418 59.9343 11.794 58.4273 11.794 56.5271V35.0357C11.794 34.7081 12.0561 34.446 12.3837 34.446C12.7113 34.446 12.9734 34.7081 12.9734 35.0357V56.5927C12.9734 58.4273 14.3494 59.9999 16.0529 59.9999C17.7565 59.9999 19.1325 58.4928 19.1325 56.5927V18.786C19.1325 18.4584 19.3946 18.1963 19.7222 18.1963C20.0498 18.1963 20.3119 18.4584 20.3119 18.786V32.8079C20.3119 33.9873 21.2947 35.0357 22.5397 35.0357C23.7846 35.0357 24.7674 34.0528 24.7674 32.8079V17.5411C24.8985 14.0684 22.081 11.3164 18.6738 11.3164Z" fill="currentColor"></path></svg>`;
+    for (let i = 0; i < count; i += 1) {
+        const person = makeElement("span", "uncertainty-concept-person");
+        person.setAttribute("aria-hidden", "true");
+        person.innerHTML = maleSvgMarkup;
+        cluster.appendChild(person);
+    }
+    return cluster;
+}
+
+function makeUncertaintyConceptCard(html, index) {
+    const card = makeElement("section", `text-card uncertainty-concept-card uncertainty-concept-card-${index + 1}`);
+    card.dataset.conceptCard = String(index);
+    card.appendChild(makeElement("p", "", html));
+    setBox(card, 430, 78, 1060, 228);
+    return card;
+}
+
+function createUncertaintyConceptPinLayer() {
+    const existingLayer = document.querySelector(".uncertainty-concept-pin-layer");
+
+    if (existingLayer !== null) {
+        return existingLayer;
+    }
+
+    const layer = makeElement("div", "uncertainty-concept-pin-layer");
+    const content = makeElement("div", "uncertainty-concept-pin-content");
+    const visual = makeElement("section", "uncertainty-concept-visual");
+    visual.setAttribute("role", "img");
+    visual.setAttribute(
+        "aria-label",
+        "A concise explanation of uncertainty in a clinical study: a sample produces an estimate, another comparable sample could produce a slightly different estimate, a confidence interval displays the uncertainty around the point estimate, interval width shows precision, and the interval is interpreted relative to the placebo result."
+    );
+
+    const sourceFlow = makeElement("div", "uncertainty-concept-source-flow");
+    const population = makeElement("div", "uncertainty-concept-population");
+    population.appendChild(makeConceptPeopleCluster(30, "uncertainty-concept-population-people"));
+    population.appendChild(makeElement("span", "uncertainty-concept-flow-label", "The entire population"));
+    sourceFlow.appendChild(population);
+    sourceFlow.appendChild(makeElement("span", "uncertainty-concept-arrow", "→"));
+
+    const sample = makeElement("div", "uncertainty-concept-sample");
+    sample.appendChild(makeConceptPeopleCluster(8, "uncertainty-concept-sample-people"));
+    sample.appendChild(makeElement("span", "uncertainty-concept-flow-label", "study sample"));
+    sourceFlow.appendChild(sample);
+    sourceFlow.appendChild(makeElement("span", "uncertainty-concept-arrow uncertainty-concept-arrow-last", "→"));
+
+    const flowEstimate = makeElement("div", "uncertainty-concept-flow-estimate");
+    flowEstimate.appendChild(makeElement("span", "uncertainty-concept-flow-estimate-dot"));
+    flowEstimate.appendChild(makeElement("span", "uncertainty-concept-flow-label", "one estimate"));
+    sourceFlow.appendChild(flowEstimate);
+    visual.appendChild(sourceFlow);
+
+    const variationStage = makeElement("section", "uncertainty-concept-variation-stage");
+    const variationSamples = makeElement("div", "uncertainty-concept-variation-samples");
+    [
+        { label: "comparable sample A", dot: 34 },
+        { label: "comparable sample B", dot: 50 },
+        { label: "comparable sample C", dot: 66 }
+    ].forEach((item, index) => {
+        const column = makeElement("div", `uncertainty-concept-variation-column variation-column-${index + 1}`);
+        const sampleBox = makeElement("div", "uncertainty-concept-variation-sample");
+        sampleBox.appendChild(makeConceptPeopleCluster(8, `uncertainty-concept-variation-people variation-people-${index + 1}`));
+        sampleBox.appendChild(makeElement("span", "uncertainty-concept-variation-sample-label", item.label));
+        column.appendChild(sampleBox);
+        column.appendChild(makeElement("span", "uncertainty-concept-variation-arrow", "↓"));
+        const result = makeElement("div", "uncertainty-concept-variation-result");
+        const miniAxis = makeElement("span", "uncertainty-concept-variation-mini-axis");
+        const miniDot = makeElement("span", "uncertainty-concept-variation-mini-dot");
+        miniDot.style.left = `${item.dot}%`;
+        miniAxis.appendChild(miniDot);
+        result.appendChild(miniAxis);
+        result.appendChild(makeElement("span", "uncertainty-concept-variation-result-label", "slightly different estimate"));
+        column.appendChild(result);
+        variationSamples.appendChild(column);
+    });
+    variationStage.appendChild(variationSamples);
+    variationStage.appendChild(makeElement(
+        "p",
+        "uncertainty-concept-variation-note",
+        "Fewer participants or fewer observed events usually mean greater uncertainty."
+    ));
+    visual.appendChild(variationStage);
+
+    const axis = makeElement("div", "uncertainty-concept-axis uncertainty-concept-main-interval");
+    axis.appendChild(makeElement("span", "uncertainty-concept-axis-line"));
+
+    const tickLayer = makeElement("div", "uncertainty-concept-axis-ticks");
+    [10, 20, 30, 40, 50, 60, 70, 80, 90].forEach((position) => {
+        const tick = makeElement("span", "uncertainty-concept-axis-tick");
+        tick.style.left = `${position}%`;
+        tick.setAttribute("aria-hidden", "true");
+        tickLayer.appendChild(tick);
+    });
+    axis.appendChild(tickLayer);
+
+    const band = makeElement("span", "uncertainty-concept-band");
+    band.setAttribute("aria-hidden", "true");
+    axis.appendChild(band);
+
+    const estimateDot = makeElement("span", "uncertainty-concept-estimate-dot");
+    estimateDot.setAttribute("aria-hidden", "true");
+    axis.appendChild(estimateDot);
+    axis.appendChild(makeElement("span", "uncertainty-concept-estimate-label", "point estimate"));
+    axis.appendChild(makeElement("span", "uncertainty-concept-range-label", "95% confidence interval"));
+    const intervalNoteStack = makeElement("div", "uncertainty-concept-interval-note-stack");
+    intervalNoteStack.appendChild(makeElement(
+        "p",
+        "uncertainty-concept-confidence-note",
+        "The 95% describes how the interval-making method performs across many similar repeated studies."
+    ));
+    intervalNoteStack.appendChild(makeElement(
+        "p",
+        "uncertainty-concept-sampling-note",
+        "The interval mainly reflects uncertainty from sampling, not every possible source of bias."
+    ));
+    axis.appendChild(intervalNoteStack);
+    visual.appendChild(axis);
+
+    const precisionStage = makeElement("section", "uncertainty-concept-precision-comparison-stage");
+    const makePrecisionPanel = (kind, title, subtitle, left, width) => {
+        const panel = makeElement("div", `uncertainty-concept-precision-panel is-${kind}`);
+        panel.appendChild(makeElement("h3", "uncertainty-concept-precision-title", title));
+        const miniAxis = makeElement("div", "uncertainty-concept-precision-axis");
+        miniAxis.appendChild(makeElement("span", "uncertainty-concept-precision-axis-line"));
+        const miniBand = makeElement("span", "uncertainty-concept-precision-band");
+        miniBand.style.left = `${left}%`;
+        miniBand.style.width = `${width}%`;
+        miniAxis.appendChild(miniBand);
+        miniAxis.appendChild(makeElement("span", "uncertainty-concept-precision-dot"));
+        panel.appendChild(miniAxis);
+        panel.appendChild(makeElement("p", "uncertainty-concept-precision-subtitle", subtitle));
+        return panel;
+    };
+    precisionStage.appendChild(makePrecisionPanel("narrow", "Narrower range", "more precise estimate", 36, 28));
+    precisionStage.appendChild(makePrecisionPanel("wide", "Wider range", "exact value is less certain", 18, 64));
+    visual.appendChild(precisionStage);
+
+    const interpretationStage = makeElement("section", "uncertainty-concept-interpretation-stage");
+    interpretationStage.appendChild(makeElement(
+        "h3",
+        "uncertainty-concept-interpretation-heading",
+        "Compare the full range with the placebo result"
+    ));
+    const interpretationChart = makeElement("div", "uncertainty-concept-interpretation-chart");
+    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-axis"));
+    const reference = makeElement("span", "uncertainty-concept-placebo-reference");
+    reference.appendChild(makeElement("span", "uncertainty-concept-placebo-reference-label", "placebo result"));
+    interpretationChart.appendChild(reference);
+    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-band"));
+    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-dot"));
+    interpretationStage.appendChild(interpretationChart);
+    interpretationStage.appendChild(makeElement(
+        "p",
+        "uncertainty-concept-interpretation-status is-below",
+        "The whole range stays below the placebo result:<br><strong>all values still indicate fewer cases with vaccination.</strong>"
+    ));
+    interpretationStage.appendChild(makeElement(
+        "p",
+        "uncertainty-concept-interpretation-status is-spans",
+        "The range spans the placebo result:<br><strong>the data also allow little or no difference.</strong>"
+    ));
+    visual.appendChild(interpretationStage);
+
+    content.appendChild(visual);
+
+    const cardCopy = [
+        "In general, studies use a <span class=\"blue\">sample</span> of people rather than the entire population. The sample data are used to calculate an estimate of a population value.",
+        "However, the estimate of the study could vary if different people had taken part, or if the same type of study is carried out again. This variation is one source of <span class=\"blue\">uncertainty in study data</span>.",
+        "Here, the red dot shows the study’s estimate. The grey line behind the dot is a <span class=\"blue\">confidence interval</span>, showing a range of values which likely contains the true population value.",
+        "The estimated range of values helps make statistical uncertainty visible.<br>A narrower range means a more certain estimate, and <br>a wider interval indicates less precision.",
+        "For the charts that follow, consider the whole confidence interval for the difference between the vaccination and placebo groups.",
+        "If the range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
+        "If the range spans the placebo result,<br>the data also allow little or no difference.",
+        "So, what uncertainty ranges<br>did this study report?"
+    ];
+    cardCopy.forEach((html, index) => content.appendChild(makeUncertaintyConceptCard(html, index)));
+
+    layer.appendChild(content);
+    document.body.appendChild(layer);
+    return layer;
+}
+
+function addUncertaintyConceptScrollScene(sectionName, absoluteTop) {
+    const sceneHeight = 8200;
+    const pinOffset = 0;
+    const pinDuration = 8200;
+    const scene = makeElement("div", "uncertainty-concept-scrolly");
+    scene.dataset.absoluteTop = String(absoluteTop);
+    scene.dataset.sceneHeight = String(sceneHeight);
+    scene.dataset.pinOffset = String(pinOffset);
+    scene.dataset.pinDuration = String(pinDuration);
+
+    appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
+    createUncertaintyConceptPinLayer();
+    return scene;
+}
+
+function updateUncertaintyConceptScrolly(currentDesignY) {
+    const scene = document.querySelector(".uncertainty-concept-scrolly");
+    const pinLayer = document.querySelector(".uncertainty-concept-pin-layer");
+
+    if (scene === null || pinLayer === null) {
+        return;
+    }
+
+    const sceneTop = parseFloat(scene.dataset.absoluteTop || "0");
+    const pinOffset = parseFloat(scene.dataset.pinOffset || "0");
+    const pinDuration = parseFloat(scene.dataset.pinDuration || "1");
+    currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
+
+    const pinStart = sceneTop - pinOffset;
+    const pinEnd = pinStart + pinDuration;
+    const progress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
+    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
+    const content = pinLayer.querySelector(".uncertainty-concept-pin-content");
+    const visual = pinLayer.querySelector(".uncertainty-concept-visual");
+    const sourceFlow = pinLayer.querySelector(".uncertainty-concept-source-flow");
+    const sourcePopulation = pinLayer.querySelector(".uncertainty-concept-population");
+    const sourceSample = pinLayer.querySelector(".uncertainty-concept-sample");
+    const sourceEstimate = pinLayer.querySelector(".uncertainty-concept-flow-estimate");
+    const sourceArrows = pinLayer.querySelectorAll(".uncertainty-concept-arrow");
+    const variationStage = pinLayer.querySelector(".uncertainty-concept-variation-stage");
+    const variationColumns = pinLayer.querySelectorAll(".uncertainty-concept-variation-column");
+    const axis = pinLayer.querySelector(".uncertainty-concept-main-interval");
+    const band = pinLayer.querySelector(".uncertainty-concept-band");
+    const estimateDot = pinLayer.querySelector(".uncertainty-concept-estimate-dot");
+    const estimateLabel = pinLayer.querySelector(".uncertainty-concept-estimate-label");
+    const rangeLabel = pinLayer.querySelector(".uncertainty-concept-range-label");
+    const confidenceNote = pinLayer.querySelector(".uncertainty-concept-confidence-note");
+    const samplingNote = pinLayer.querySelector(".uncertainty-concept-sampling-note");
+    const precisionStage = pinLayer.querySelector(".uncertainty-concept-precision-comparison-stage");
+    const precisionPanels = pinLayer.querySelectorAll(".uncertainty-concept-precision-panel");
+    const interpretationStage = pinLayer.querySelector(".uncertainty-concept-interpretation-stage");
+    const interpretationBand = pinLayer.querySelector(".uncertainty-concept-interpretation-band");
+    const interpretationDot = pinLayer.querySelector(".uncertainty-concept-interpretation-dot");
+    const belowStatus = pinLayer.querySelector(".uncertainty-concept-interpretation-status.is-below");
+    const spansStatus = pinLayer.querySelector(".uncertainty-concept-interpretation-status.is-spans");
+
+    const windowOpacity = (inStart, inEnd, outStart, outEnd) => (
+        smoothStep(inStart, inEnd, progress) * (1 - smoothStep(outStart, outEnd, progress))
+    );
+    const conceptGraphicScale = isMobileLayout() ? 1.32 : 1;
+
+    const layerFadeIn = smoothStep(0.00, 0.025, progress);
+    const layerFadeOut = 1 - smoothStep(0.965, 0.995, progress);
+    const layerOpacity = isPinned ? Math.min(layerFadeIn, layerFadeOut) : 0;
+
+    pinLayer.classList.toggle("is-active", isPinned);
+    pinLayer.style.opacity = layerOpacity.toFixed(3);
+
+    if (content !== null) {
+        content.style.top = `${Math.round(getPinOffsetY())}px`;
+        content.style.opacity = "1";
+    }
+
+    if (visual !== null) {
+        const endDim = 1 - (0.78 * smoothStep(0.885, 0.930, progress));
+        visual.style.opacity = endDim.toFixed(3);
+    }
+
+    if (sourceFlow !== null) {
+        const opacity = windowOpacity(0.015, 0.040, 0.155, 0.180);
+        sourceFlow.style.opacity = opacity.toFixed(3);
+        sourceFlow.style.transform = `translate3d(0, ${lerp(24, 0, smoothStep(0.015, 0.060, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+    }
+
+    const revealFlowPart = (element, start, end) => {
+        if (!element) return;
+        const reveal = smoothStep(start, end, progress);
+        const fade = 1 - smoothStep(0.155, 0.180, progress);
+        element.style.opacity = (reveal * fade).toFixed(3);
+        element.style.transform = `translate3d(${lerp(-16, 0, reveal).toFixed(1)}px, 0, 0) scale(${lerp(0.97, 1, reveal).toFixed(3)})`;
+    };
+    revealFlowPart(sourcePopulation, 0.020, 0.050);
+    revealFlowPart(sourceArrows[0], 0.055, 0.080);
+    revealFlowPart(sourceSample, 0.075, 0.105);
+    revealFlowPart(sourceArrows[1], 0.105, 0.130);
+    revealFlowPart(sourceEstimate, 0.125, 0.155);
+
+    if (variationStage !== null) {
+        const opacity = windowOpacity(0.165, 0.190, 0.305, 0.330);
+        variationStage.style.opacity = opacity.toFixed(3);
+        variationStage.style.transform = `translate3d(0, ${lerp(22, 0, smoothStep(0.165, 0.215, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+    }
+    variationColumns.forEach((column, index) => {
+        const start = 0.175 + (index * 0.020);
+        const reveal = smoothStep(start, start + 0.035, progress) * (1 - smoothStep(0.305, 0.330, progress));
+        column.style.opacity = reveal.toFixed(3);
+        column.style.transform = `translate3d(0, ${lerp(18, 0, reveal).toFixed(1)}px, 0) scale(${lerp(0.97, 1, reveal).toFixed(3)})`;
+    });
+
+    const axisOpacity = windowOpacity(0.315, 0.345, 0.490, 0.520);
+    if (axis !== null) {
+        axis.style.opacity = axisOpacity.toFixed(3);
+        axis.style.transform = `translate3d(0, ${lerp(18, 0, smoothStep(0.315, 0.370, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+    }
+    if (estimateDot !== null) {
+        estimateDot.style.left = "50%";
+        estimateDot.style.opacity = axisOpacity.toFixed(3);
+    }
+    if (estimateLabel !== null) {
+        estimateLabel.style.left = "50%";
+        estimateLabel.style.opacity = axisOpacity.toFixed(3);
+    }
+    if (rangeLabel !== null) {
+        rangeLabel.style.opacity = axisOpacity.toFixed(3);
+    }
+    if (band !== null) {
+        const reveal = smoothStep(0.345, 0.385, progress) * (1 - smoothStep(0.490, 0.520, progress));
+        band.style.left = "35%";
+        band.style.width = "30%";
+        band.style.opacity = reveal.toFixed(3);
+        band.style.transform = `scaleX(${Math.max(0.001, reveal).toFixed(3)})`;
+    }
+    if (confidenceNote !== null) {
+        confidenceNote.style.opacity = windowOpacity(0.385, 0.405, 0.475, 0.500).toFixed(3);
+    }
+    if (samplingNote !== null) {
+        samplingNote.style.opacity = windowOpacity(0.415, 0.435, 0.475, 0.500).toFixed(3);
+    }
+
+    if (precisionStage !== null) {
+        const opacity = windowOpacity(0.505, 0.535, 0.650, 0.680);
+        precisionStage.style.opacity = opacity.toFixed(3);
+        precisionStage.style.transform = `translate3d(0, ${lerp(22, 0, smoothStep(0.505, 0.555, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+    }
+    precisionPanels.forEach((panel, index) => {
+        const start = 0.515 + (index * 0.035);
+        const reveal = smoothStep(start, start + 0.040, progress) * (1 - smoothStep(0.650, 0.680, progress));
+        panel.style.opacity = reveal.toFixed(3);
+        panel.style.transform = `translate3d(0, ${lerp(18, 0, reveal).toFixed(1)}px, 0)`;
+    });
+
+    if (interpretationStage !== null) {
+        const opacity = windowOpacity(0.660, 0.690, 0.900, 0.930);
+        interpretationStage.style.opacity = opacity.toFixed(3);
+        interpretationStage.style.transform = `translate3d(0, ${lerp(22, 0, smoothStep(0.660, 0.710, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+    }
+
+    const morph = smoothStep(0.805, 0.840, progress);
+    if (interpretationBand !== null) {
+        const left = lerp(18, 48, morph);
+        const width = lerp(34, 42, morph);
+        interpretationBand.style.left = `${left}%`;
+        interpretationBand.style.width = `${width}%`;
+    }
+    if (interpretationDot !== null) {
+        interpretationDot.style.left = `${lerp(35, 64, morph)}%`;
+    }
+    if (belowStatus !== null) {
+        belowStatus.style.opacity = windowOpacity(0.715, 0.740, 0.795, 0.820).toFixed(3);
+    }
+    if (spansStatus !== null) {
+        spansStatus.style.opacity = windowOpacity(0.835, 0.855, 0.900, 0.925).toFixed(3);
+    }
+
+    const cardWindows = [
+        [0.015, 0.035, 0.135, 0.160],
+        [0.165, 0.185, 0.290, 0.315],
+        [0.320, 0.340, 0.440, 0.465],
+        [0.500, 0.520, 0.625, 0.650],
+        [0.655, 0.675, 0.710, 0.730],
+        [0.710, 0.730, 0.790, 0.810],
+        [0.810, 0.830, 0.895, 0.915],
+        [0.900, 0.920, 0.965, 0.985]
+    ];
+
+    pinLayer.querySelectorAll(".uncertainty-concept-card").forEach((card, index) => {
+        const timing = cardWindows[index];
+        if (!timing) return;
+        const opacity = windowOpacity(timing[0], timing[1], timing[2], timing[3]);
+        const travel = smoothStep(timing[0], timing[3], progress);
+        card.style.opacity = opacity.toFixed(3);
+        card.style.visibility = opacity > 0.01 ? "visible" : "hidden";
+        const translateY = index === 7 ? 0 : lerp(24, -14, travel);
+        card.style.transform = `translate3d(0, ${translateY.toFixed(1)}px, 0)`;
+    });
+}
+
+
+function makeEffectivenessRangePinnedChart(config) {
+    const title = config && config.title
+        ? config.title
+        : 'The Uncertainty Range of Herpes Zoster Cases in the <span class="blue">Placebo</span> Group';
+    const count = config && config.count !== undefined ? config.count : 33;
+    const rangeStart = config && config.rangeStart !== undefined ? config.rangeStart : 30;
+    const rangeEnd = config && config.rangeEnd !== undefined ? config.rangeEnd : 36;
+    const meanValue = config && config.mean !== undefined ? config.mean : 33;
+    const colour = config && config.colour ? config.colour : 'red';
+    const extraClass = config && config.extraClass ? ` ${config.extraClass}` : '';
+
+    const chart = makeElement('section', `chart-section likely-range-pinned-chart${extraClass}`);
+
+    const heading = makeElement('h3', '', title);
+    chart.appendChild(heading);
+
+    const plot = makeDotPlot(count, colour, rangeStart, rangeEnd);
+    plot.classList.add('pin-managed-plot');
+    chart.appendChild(plot);
+
+    const mean = makeElement('p', 'mean', `<span class="${colour}">0~0</span> cases<br>(Mean: <span class="${colour}">0</span> cases)`);
+    mean.dataset.rangeCountUp = 'true';
+    mean.dataset.rangeStart = String(rangeStart);
+    mean.dataset.rangeEnd = String(rangeEnd);
+    mean.dataset.countUp = String(meanValue);
+    mean.dataset.colour = colour;
+    chart.appendChild(mean);
+
+    const legend = makeLegend(colour, 'Case of herpes zoster', true);
+    chart.appendChild(legend);
+
+    return chart;
+}
+
+function resetEffectivenessRangePinnedChart(chart) {
+    if (chart === null) {
+        return;
+    }
+
+    const plot = chart.querySelector('.dot-plot');
+    const mean = chart.querySelector('.mean[data-range-count-up]');
+
+    if (plot !== null) {
+        plot.classList.remove('plot-animated', 'dot-morphing');
+        delete plot.dataset.animated;
+        resetDotMorph(plot);
+    }
+
+    if (mean !== null) {
+        delete mean.dataset.counted;
+        mean.innerHTML = '<span class="red">0~0</span> cases<br>(Mean: <span class="red">0</span> cases)';
+    }
+}
+
+function makeEffectivenessRangePinnedCard(html, extraClass) {
+    const className = extraClass ? `text-card effectiveness-range-pinned-card ${extraClass}` : 'text-card effectiveness-range-pinned-card';
+    const card = makeElement('section', className);
+    card.appendChild(makeElement('p', '', html));
+    card.setAttribute('aria-hidden', 'true');
+    return card;
+}
+
+
+function makeEffectivenessRangePinnedCompare() {
+    const compare = makeElement('section', 'compare-section effectiveness-range-pinned-compare');
+
+    const title = makeElement('h2', 'title compare-title', 'The Effectiveness of Vaccination');
+    setBox(title, 425, 0, 1070);
+    compare.appendChild(title);
+
+    const leftLabel = makeElement('p', 'compare-label', '<span class="blue">Placebo group</span>');
+    setBox(leftLabel, 180, 150, 600);
+    compare.appendChild(leftLabel);
+
+    const rightLabel = makeElement('p', 'compare-label', '<span class="blue">Vaccinated group</span>');
+    setBox(rightLabel, 1140, 150, 600);
+    compare.appendChild(rightLabel);
+
+    const vs = makeElement('div', 'vs red-vs', 'VS');
+    setBox(vs, 906, 105, 108, 108);
+    compare.appendChild(vs);
+
+    const leftPlot = makeElement('div', 'side-plot effectiveness-range-compare-left');
+    setBox(leftPlot, 65, 245, 830, 520);
+    const leftDots = makeDotPlot(33, 'red', 30, 36);
+    leftDots.classList.add('pin-managed-plot');
+    leftPlot.appendChild(leftDots);
+    const leftMean = makeElement('p', 'mean', '<span class="red">0~0</span> cases<br>(Mean: <span class="red">0</span> cases)');
+    leftMean.dataset.rangeCountUp = 'true';
+    leftMean.dataset.rangeStart = '30';
+    leftMean.dataset.rangeEnd = '36';
+    leftMean.dataset.countUp = '33';
+    leftMean.dataset.colour = 'red';
+    leftPlot.appendChild(leftMean);
+    compare.appendChild(leftPlot);
+
+    const arrow = document.createElement('img');
+    arrow.className = 'arrow-icon';
+    arrow.alt = 'A down arrow showing reduction after vaccination';
+    arrow.src = './assets/arrow1.png';
+    setBox(arrow, 886, 352, 148, 148);
+    compare.appendChild(arrow);
+
+    const rightPlot = makeElement('div', 'side-plot effectiveness-range-compare-right');
+    setBox(rightPlot, 1025, 245, 830, 520);
+    const rightDots = makeDotPlot(16, 'red', 14, 19);
+    rightDots.classList.add('pin-managed-plot');
+    rightPlot.appendChild(rightDots);
+    const rightMean = makeElement('p', 'mean', '<span class="red">0~0</span> cases<br>(Mean: <span class="red">0</span> cases)');
+    rightMean.dataset.rangeCountUp = 'true';
+    rightMean.dataset.rangeStart = '14';
+    rightMean.dataset.rangeEnd = '19';
+    rightMean.dataset.countUp = '16';
+    rightMean.dataset.colour = 'red';
+    rightPlot.appendChild(rightMean);
+    compare.appendChild(rightPlot);
+
+    const legend = makeLegend('red', 'Case of herpes zoster', true);
+    compare.appendChild(legend);
+
+    return compare;
+}
+
+function createEffectivenessRangePinLayer() {
+    const existingLayer = document.querySelector('.effectiveness-range-pin-layer');
+
+    if (existingLayer !== null) {
+        return existingLayer;
+    }
+
+    const layer = makeElement('div', 'effectiveness-range-pin-layer');
+    const content = makeElement('div', 'effectiveness-range-pin-content');
+
+    const placeboChart = makeEffectivenessRangePinnedChart({
+        title: 'The Uncertainty Range of Herpes Zoster Cases in the <span class="blue">Placebo</span> Group',
+        count: 33,
+        rangeStart: 30,
+        rangeEnd: 36,
+        mean: 33,
+        colour: 'red',
+        extraClass: 'likely-range-pinned-chart--placebo'
+    });
+    setBox(placeboChart, 410, 160, 1100, 760);
+    content.appendChild(placeboChart);
+
+    const vaccinatedChart = makeEffectivenessRangePinnedChart({
+        title: 'The Uncertainty Range of Herpes Zoster Cases in the <span class="blue">Vaccinated</span> Group',
+        count: 16,
+        rangeStart: 14,
+        rangeEnd: 19,
+        mean: 16,
+        colour: 'red',
+        extraClass: 'likely-range-pinned-chart--vaccinated'
+    });
+    setBox(vaccinatedChart, 410, 160, 1100, 760);
+    content.appendChild(vaccinatedChart);
+
+    const placeboCard = makeEffectivenessRangePinnedCard(
+        'The number of people who get herpes zoster in the placebo group is likely between <span class="red">30</span> and <span class="red">36</span> people in every 1000 people.',
+        'effectiveness-range-pinned-card--placebo'
+    );
+    setBox(placeboCard, 464, 0, 993, 301);
+    content.appendChild(placeboCard);
+
+    const vaccinatedCard = makeEffectivenessRangePinnedCard(
+        'The number of people who get herpes zoster in the vaccinated group is likely between <span class="red">14</span> and <span class="red">19</span> people in every 1000 people.',
+        'effectiveness-range-pinned-card--vaccinated'
+    );
+    setBox(vaccinatedCard, 464, 0, 993, 301);
+    content.appendChild(vaccinatedCard);
+
+    const compare = makeEffectivenessRangePinnedCompare();
+    setBox(compare, 0, 112, 1920, 850);
+    content.appendChild(compare);
+
+    const compareLowerCard = makeEffectivenessRangePinnedCard(
+        'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases compared to the placebo group.',
+        'effectiveness-range-pinned-card--compare-lower'
+    );
+    setBox(compareLowerCard, 464, 0, 993, 301);
+    content.appendChild(compareLowerCard);
+
+    const compareMeanDifferenceCard = makeEffectivenessRangePinnedCard(
+        'The most likely range is lower in the vaccinated group at <span class="red">14</span> to <span class="red">19</span> cases per 1000 people, compared with <span class="red">30</span> to <span class="red">36</span> in the placebo group.',
+        'effectiveness-range-pinned-card--mean-difference'
+    );
+    setBox(compareMeanDifferenceCard, 464, 0, 993, 301);
+    content.appendChild(compareMeanDifferenceCard);
+
+    const compareOverallCard = makeEffectivenessRangePinnedCard(
+        'Overall, this study shows that the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
+        'effectiveness-range-pinned-card--compare-overall'
+    );
+    setBox(compareOverallCard, 464, 0, 993, 301);
+    content.appendChild(compareOverallCard);
+
+    const safetyIntro = makeElement('div', 'effectiveness-range-safety-intro');
+    const safetyIntroTitle = makeElement('h2', 'title section-title', 'The <span class="blue">Safety</span> of Vaccination');
+    const safetyIntroSub = makeElement('p', 'subtitle', 'How many people experienced a <span class="blue">serious adverse effect</span><br>in the placebo group and in the vaccinated group?');
+    safetyIntro.appendChild(safetyIntroTitle);
+    safetyIntro.appendChild(safetyIntroSub);
+    setBox(safetyIntro, 260, 0, 1400, 1080);
+    content.appendChild(safetyIntro);
+
+    const safetyInfoCard = makeEffectivenessRangePinnedCard('Serious adverse effects refer to severe outcomes such as death, life-threatening conditions, hospitalisation, disability or permanent damage, congenital anomalies/birth defects, required intervention to prevent permanent impairment or damage, or other important medical events.', 'effectiveness-range-safety-info-card');
+    setBox(safetyInfoCard, 464, 0, 993, 301);
+    content.appendChild(safetyInfoCard);
+
+    layer.appendChild(content);
+    document.body.appendChild(layer);
+    return layer;
+}
+
+function addEffectivenessRangeScrollScene(sectionName, absoluteTop) {
+    const sceneHeight = 8600;
+    const pinOffset = 0;
+    const pinDuration = 8600;
+    const scene = makeElement('div', 'effectiveness-range-scrolly');
+    scene.dataset.absoluteTop = String(absoluteTop);
+    scene.dataset.sceneHeight = String(sceneHeight);
+    scene.dataset.pinOffset = String(pinOffset);
+    scene.dataset.pinDuration = String(pinDuration);
+
+    appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
+    createEffectivenessRangePinLayer();
+    return scene;
+}
+
+function updateEffectivenessRangeScrolly(currentDesignY) {
+    const scene = document.querySelector('.effectiveness-range-scrolly');
+    const pinLayer = document.querySelector('.effectiveness-range-pin-layer');
+
+    if (scene === null || pinLayer === null) {
+        return;
+    }
+
+    const sceneTop = parseFloat(scene.dataset.absoluteTop || '0');
+    const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
+    const pinDuration = parseFloat(scene.dataset.pinDuration || '1');
+    currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
+    const actualDesignY = readDesignScrollY();
+    const progressDesignY = actualDesignY > currentDesignY ? actualDesignY : currentDesignY;
+
+    const pinStart = sceneTop - pinOffset;
+    const pinEnd = pinStart + pinDuration;
+    const preRevealStart = pinStart - 320;
+    const preRevealEnd = pinStart - 80;
+    const buildDuration = 5000;
+    const scrollDist = progressDesignY - pinStart;
+    const overallProgress = clamp(scrollDist / pinDuration, 0, 1);
+    const progress = clamp(scrollDist / buildDuration, 0, 1);
+    const outroDuration = Math.max(1, pinDuration - buildDuration);
+    const outroProgress = clamp((scrollDist - buildDuration) / outroDuration, 0, 1);
+    const isPinned = getScenePinnedState(currentDesignY, preRevealStart, pinEnd);
+
+    const content = pinLayer.querySelector('.effectiveness-range-pin-content');
+    const placeboChart = pinLayer.querySelector('.likely-range-pinned-chart--placebo');
+    const vaccinatedChart = pinLayer.querySelector('.likely-range-pinned-chart--vaccinated');
+    const placeboCard = pinLayer.querySelector('.effectiveness-range-pinned-card--placebo');
+    const vaccinatedCard = pinLayer.querySelector('.effectiveness-range-pinned-card--vaccinated');
+    const compareLowerCard = pinLayer.querySelector('.effectiveness-range-pinned-card--compare-lower');
+    const compareMeanDifferenceCard = pinLayer.querySelector('.effectiveness-range-pinned-card--mean-difference');
+    const compareOverallCard = pinLayer.querySelector('.effectiveness-range-pinned-card--compare-overall');
+    const rangeCompare = pinLayer.querySelector('.effectiveness-range-pinned-compare');
+    const safetyInfoCard = pinLayer.querySelector('.effectiveness-range-safety-info-card');
+    const safetyFirstChart = document.querySelector('#section-safety .safety-first-chart');
+
+    const preRevealOpacity = smoothStep(preRevealStart, preRevealEnd, progressDesignY);
+    const layerFadeIn = scrollDist < 0 ? preRevealOpacity : Math.max(preRevealOpacity, smoothStep(0.00, 0.02, overallProgress));
+    const layerOpacity = isPinned ? layerFadeIn : 0;
+
+    pinLayer.classList.toggle('is-active', isPinned);
+    pinLayer.style.opacity = layerOpacity.toFixed(3);
+
+    if (content !== null) {
+        content.style.top = `${Math.round(getPinOffsetY())}px`;
+        content.style.opacity = layerOpacity.toFixed(3);
+    }
+
+    if (!isPinned && progress <= 0.02) {
+        resetEffectivenessRangePinnedChart(placeboChart);
+        resetEffectivenessRangePinnedChart(vaccinatedChart);
+    }
+
+    const setPinnedRangeChartState = (chart, options) => {
+        if (chart === null) {
+            return;
+        }
+
+        const regularReveal = smoothStep(options.revealStart, options.revealEnd, progress);
+        const handoffReveal = Number.isFinite(options.handoffStart) && Number.isFinite(options.handoffEnd)
+            ? smoothStep(options.handoffStart, options.handoffEnd, progressDesignY)
+            : 0;
+        const chartReveal = Math.max(regularReveal, handoffReveal);
+        const chartHold = 1 - smoothStep(options.fadeStart, options.fadeEnd, progress);
+        const chartOpacity = Math.min(chartReveal, chartHold) * (options.parentFadeOnly ? 1 : layerOpacity);
+        chart.style.opacity = chartOpacity.toFixed(3);
+        chart.style.visibility = chartOpacity > 0.02 ? 'visible' : 'hidden';
+        chart.style.transform = `translate3d(0, 0, 0) scale(${getMobileBackgroundScale().toFixed(4)})`;
+
+        const getStageProgress = (designStart, designEnd, fallbackStart, fallbackEnd) => {
+            if (Number.isFinite(designStart) && Number.isFinite(designEnd)) {
+                const start = pinStart + designStart;
+                const end = pinStart + designEnd;
+                return clamp((progressDesignY - start) / Math.max(1, end - start), 0, 1);
+            }
+            return clamp((progress - fallbackStart) / Math.max(0.0001, fallbackEnd - fallbackStart), 0, 1);
+        };
+
+        const plot = chart.querySelector('.dot-plot');
+        const dotProgress = getStageProgress(
+            options.dotDesignStart,
+            options.dotDesignEnd,
+            options.dotStart,
+            options.dotEnd
+        );
+        if (plot !== null) {
+            if (chartOpacity > 0.01 && (dotProgress > 0.001 || options.precluster)) {
+                applyDotMorph(plot, dotProgress, {
+                    clusterX: 415,
+                    clusterY: 258,
+                    radius: 50,
+                    startScale: 0.30,
+                    curve: 24
+                });
+                plot.style.opacity = chartOpacity.toFixed(3);
+            } else {
+                resetDotMorph(plot);
+                plot.style.opacity = chartOpacity > 0.01 ? '0' : chartOpacity.toFixed(3);
+            }
+        }
+
+        const rangeReveal = smoothStep(0, 1, getStageProgress(
+            options.rangeDesignStart,
+            options.rangeDesignEnd,
+            options.rangeVisualStart,
+            options.rangeVisualEnd
+        ));
+        chart.querySelectorAll('.range-background').forEach((element) => {
+            element.style.opacity = (chartOpacity * rangeReveal).toFixed(3);
+            element.style.transform = `scaleX(${rangeReveal.toFixed(3)})`;
+        });
+        chart.querySelectorAll('.range-mean-highlight').forEach((element) => {
+            element.style.opacity = (chartOpacity * rangeReveal).toFixed(3);
+            element.style.transform = `scaleY(${(0.7 + (rangeReveal * 0.3)).toFixed(3)})`;
+        });
+
+        const meanElement = chart.querySelector('.mean[data-range-count-up]');
+        if (meanElement !== null) {
+            const countProgress = getStageProgress(
+                options.countDesignStart,
+                options.countDesignEnd,
+                options.countStart,
+                options.countEnd
+            );
+            setScrollTiedRangeCount(
+                meanElement,
+                options.rangeStart,
+                options.rangeEnd,
+                options.meanValue,
+                options.colour,
+                countProgress
+            );
+            const meanReveal = smoothStep(0.02, 0.22, countProgress);
+            const meanOpacity = chartOpacity * meanReveal;
+            meanElement.style.opacity = meanOpacity.toFixed(3);
+            meanElement.style.transform = 'translate3d(0, 0, 0)';
+        }
+
+        chart.querySelectorAll('h3, .legend').forEach((element) => {
+            element.style.opacity = chartOpacity.toFixed(3);
+            element.style.transform = chartOpacity > 0.01 ? 'translate3d(0, 0, 0)' : 'translate3d(0, 10px, 0)';
+        });
+    };
+
+
+    const setPinnedCompareState = (compare, options) => {
+        if (compare === null) {
+            return;
+        }
+
+        const reveal = smoothStep(options.revealStart, options.revealEnd, progress);
+        const fadeOut = 1 - smoothStep(options.fadeStart, options.fadeEnd, progress);
+        const compareOpacity = reveal * fadeOut * layerOpacity;
+        compare.style.opacity = compareOpacity.toFixed(3);
+        compare.style.visibility = compareOpacity > 0.02 ? 'visible' : 'hidden';
+        compare.style.transform = `translate3d(0, 0, 0) scale(${getMobileBackgroundScale().toFixed(4)})`;
+
+        const dotProgress = clamp((progress - options.dotStart) / (options.dotEnd - options.dotStart), 0, 1);
+        compare.querySelectorAll('.dot-plot').forEach((plot, plotIndex) => {
+            if (dotProgress > 0.001 && compareOpacity > 0.01) {
+                applyDotMorph(plot, dotProgress, {
+                    clusterX: 415,
+                    clusterY: 258,
+                    radius: 50,
+                    startScale: 0.30,
+                    curve: 24
+                });
+                plot.style.opacity = compareOpacity.toFixed(3);
+            } else {
+                resetDotMorph(plot);
+                plot.style.opacity = compareOpacity.toFixed(3);
+            }
+        });
+
+        const rangeReveal = smoothStep(options.rangeVisualStart, options.rangeVisualEnd, progress);
+        compare.querySelectorAll('.range-background').forEach((element) => {
+            element.style.opacity = (compareOpacity * rangeReveal).toFixed(3);
+            element.style.transform = `scaleX(${rangeReveal.toFixed(3)})`;
+        });
+        compare.querySelectorAll('.range-mean-highlight').forEach((element) => {
+            element.style.opacity = (compareOpacity * rangeReveal).toFixed(3);
+            element.style.transform = `scaleY(${(0.7 + (rangeReveal * 0.3)).toFixed(3)})`;
+        });
+
+        const countProgress = (progress - options.countStart) / (options.countEnd - options.countStart);
+        const leftMean = compare.querySelector('.effectiveness-range-compare-left .mean[data-range-count-up]');
+        const rightMean = compare.querySelector('.effectiveness-range-compare-right .mean[data-range-count-up]');
+        setScrollTiedRangeCount(leftMean, 30, 36, 33, 'red', countProgress);
+        setScrollTiedRangeCount(rightMean, 14, 19, 16, 'red', countProgress);
+
+        compare.querySelectorAll('h2, .compare-label, .vs, .legend, .mean').forEach((element) => {
+            const labelReveal = smoothStep(options.revealStart, options.revealEnd, progress);
+            element.style.opacity = (compareOpacity * labelReveal).toFixed(3);
+            element.style.transform = labelReveal > 0.01 ? 'translate3d(0, 0, 0)' : 'translate3d(0, 10px, 0)';
+        });
+
+        const arrow = compare.querySelector('.arrow-icon');
+        if (arrow !== null) {
+            const arrowReveal = smoothStep(options.arrowStart, options.arrowEnd, progress);
+            arrow.style.opacity = (compareOpacity * arrowReveal).toFixed(3);
+            arrow.style.transform = `translate3d(0, ${Math.round(lerp(14, 0, arrowReveal))}px, 0)`;
+        }
+    };
+
+    setPinnedRangeChartState(placeboChart, {
+        handoffStart: pinStart - 320,
+        handoffEnd: pinStart - 80,
+        parentFadeOnly: true,
+        precluster: true,
+        revealStart: 0.09,
+        revealEnd: 0.17,
+        dotStart: 0.16,
+        dotEnd: 0.30,
+        dotDesignStart: -200,
+        dotDesignEnd: 520,
+        rangeVisualStart: 0.31,
+        rangeVisualEnd: 0.38,
+        rangeDesignStart: 320,
+        rangeDesignEnd: 820,
+        countStart: 0.22,
+        countEnd: 0.38,
+        countDesignStart: -150,
+        countDesignEnd: 550,
+        fadeStart: 0.52,
+        fadeEnd: 0.58,
+        rangeStart: 30,
+        rangeEnd: 36,
+        meanValue: 33,
+        colour: 'red'
+    });
+
+    setPinnedRangeChartState(vaccinatedChart, {
+        revealStart: 0.58,
+        revealEnd: 0.66,
+        dotStart: 0.62,
+        dotEnd: 0.73,
+        rangeVisualStart: 0.74,
+        rangeVisualEnd: 0.81,
+        countStart: 0.68,
+        countEnd: 0.82,
+        fadeStart: 0.88,
+        fadeEnd: 0.92,
+        rangeStart: 14,
+        rangeEnd: 19,
+        meanValue: 16,
+        colour: 'red'
+    });
+
+    if (placeboCard !== null) {
+        setVaccineCardScrollPosition(placeboCard, clamp((progress - 0.50) / 0.18, 0, 1), 1080, -430);
+    }
+
+    if (vaccinatedCard !== null) {
+        setVaccineCardScrollPosition(vaccinatedCard, clamp((progress - 0.81) / 0.13, 0, 1), 1080, -430);
+    }
+
+    setPinnedCompareState(rangeCompare, {
+        revealStart: 0.915,
+        revealEnd: 0.940,
+        dotStart: 0.932,
+        dotEnd: 0.965,
+        rangeVisualStart: 0.965,
+        rangeVisualEnd: 0.978,
+        countStart: 0.945,
+        countEnd: 0.980,
+        arrowStart: 0.972,
+        arrowEnd: 0.985,
+        fadeStart: 2.0,
+        fadeEnd: 2.0
+    });
+
+    const compareFade = 1 - smoothStep(0.50, 0.62, outroProgress);
+    if (rangeCompare !== null && scrollDist >= buildDuration) {
+        const compareContainerOpacity = layerOpacity * compareFade;
+        rangeCompare.style.opacity = compareContainerOpacity.toFixed(3);
+        rangeCompare.style.visibility = compareContainerOpacity > 0.02 ? 'visible' : 'hidden';
+    }
+
+    if (compareLowerCard !== null) {
+        setVaccineCardScrollPosition(compareLowerCard, clamp(outroProgress / 0.24, 0, 1), 1080, -470);
+        compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
+    }
+
+    if (compareMeanDifferenceCard !== null) {
+        setVaccineCardScrollPosition(compareMeanDifferenceCard, clamp((outroProgress - 0.20) / 0.26, 0, 1), 1080, -470);
+        compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
+    }
+
+    if (compareOverallCard !== null) {
+        setVaccineCardScrollPosition(compareOverallCard, clamp((outroProgress - 0.42) / 0.26, 0, 1), 1080, -470);
+        compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
+    }
+
+    const safetyIntro = pinLayer.querySelector('.effectiveness-range-safety-intro');
+    if (safetyIntro !== null) {
+        const introReveal = smoothStep(0.68, 0.76, outroProgress);
+        const introFadeOut = 1 - smoothStep(0.92, 0.99, outroProgress);
+        const introOpacity = layerOpacity * Math.min(introReveal, introFadeOut);
+        safetyIntro.style.opacity = introOpacity.toFixed(3);
+        safetyIntro.style.visibility = introOpacity > 0.02 ? 'visible' : 'hidden';
+        safetyIntro.style.transform = `translate3d(0, ${lerp(26, 0, introReveal).toFixed(2)}px, 0)`;
+    }
+
+    if (safetyInfoCard !== null) {
+        const infoProgress = clamp((outroProgress - 0.78) / 0.20, 0, 1);
+        setOpaqueSpeechCardScrollPosition(safetyInfoCard, infoProgress, 1080, -470);
+    }
+
+    if (safetyFirstChart !== null) {
+        const chartReveal = smoothStep(0.92, 1.0, outroProgress);
+        const chartOpacity = chartReveal;
+        safetyFirstChart.style.opacity = chartOpacity.toFixed(3);
+        safetyFirstChart.style.visibility = chartOpacity > 0.02 ? 'visible' : 'hidden';
+        safetyFirstChart.style.transform = `translate3d(0, ${lerp(26, 0, chartReveal).toFixed(2)}px, 0)`;
+    }
+}
+
+
 function createMobileHeroLayer() {
     const existingLayer = document.querySelector(".mobile-hero-layer");
 
@@ -2269,6 +3373,98 @@ function renderIntro() {
 
 function renderEffectiveness() {
     addEffectivenessIntroScene("effectiveness", 7150);
+}
+
+function renderUncertainty() {
+    addReliabilityScrollScene("uncertainty", 15650);
+    addUncertaintyConceptScrollScene("uncertainty", 16800);
+}
+
+function renderEffectivenessRange() {
+    addEffectivenessRangeScrollScene('effectivenessRange', 25000);
+}
+
+function renderSafety() {
+    addChart("safety", {
+        top: 28306,
+        className: 'safety-first-chart',
+        title: "Serious Adverse Effect<br>in the <span class=\"blue\">Placebo</span> Group",
+        count: 22,
+        colour: "purple",
+        mean: "Mean: <span class=\"purple\">22</span> cases",
+        legend: "Case of serious adverse effect",
+        hasRange: false
+    });
+    addCard("safety", "The study shows that about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 29155);
+
+    addChart("safety", {
+        top: 29810,
+        title: "Serious Adverse Effect<br>in the <span class=\"blue\">Vaccinated</span> Group",
+        count: 23,
+        colour: "purple",
+        mean: "Mean: <span class=\"purple\">23</span> cases",
+        legend: "Case of serious adverse effect",
+        hasRange: false
+    });
+    addCard("safety", "The study shows that<br>about <span class=\"purple\">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.", 30695);
+    addCard("safety", "What is the estimated uncertainty range for serious adverse events in the study data?", 31426);
+
+    addChart("safety", {
+        top: 31888,
+        title: "The Uncertainty Range of Serious Adverse Effect in the <span class=\"blue\">Placebo</span> Group",
+        count: 22,
+        colour: "purple",
+        rangeStart: 20,
+        rangeEnd: 24,
+        mean: "<span class=\"purple\">20~24</span> cases<br>(Mean: <span class=\"purple\">22</span> cases)",
+        legend: "Case of serious adverse effect",
+        hasRange: true
+    });
+    addCard("safety", "The number of people who experience a serious adverse effect in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 32779);
+
+    addChart("safety", {
+        top: 33466,
+        title: "The Uncertainty Range of Serious Adverse Effect in the <span class=\"blue\">Vaccinated</span> Group",
+        count: 23,
+        colour: "purple",
+        rangeStart: 21,
+        rangeEnd: 26,
+        mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)",
+        legend: "Case of serious adverse effect",
+        hasRange: true
+    });
+    addCard("safety", "The number of people who experience a serious adverse effect in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 34356);
+
+    addCompare("safety", {
+        top: 35042,
+        title: "The Serious Adverse Effect of Vaccination",
+        colour: "purple",
+        arrowFile: "arrow2.png",
+        arrowAlt: "An up arrow showing slightly more serious adverse events after vaccination",
+        legend: "Case of serious adverse effect",
+        left: {
+            count: 22,
+            rangeStart: 20,
+            rangeEnd: 24,
+            mean: "<span class=\"purple\">20~24</span> cases<br>(Mean: <span class=\"purple\">22</span> cases)"
+        },
+        right: {
+            count: 23,
+            rangeStart: 21,
+            rangeEnd: 26,
+            mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)"
+        }
+    });
+    addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 35984);
+    addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 36345);
+    addCard("safety", "Overall, the study shows no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.", 36706);
+}
+
+function renderClosing() {
+    addCard("closing", "This information may help you consider the possible benefits and harms of vaccination, while keeping the uncertainty inherent in the evidence in mind.", 37421);
+    addImage("closing", "own_factors_transparent_highres.png", "Personal factors for vaccination decision", 435, 37787, 1050, 847, "own-factors");
+    addCard("closing", "However, the results should be interpreted alongside your personal risk of herpes zoster and relevant circumstances, including your age, immune status, and medical history, for an informed vaccination decision.", 38699);
+    addParagraph("closing", "Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.", "closing final-message", 260, 39357, 1400);
 }
 
 function runRangeCountUp(meanElement) {
@@ -2529,59 +3725,47 @@ function setupScrollamaState() {
     renderFromScrollama();
 }
 
-const EFFECTIVENESS_HANDOFF_OVERLAP = 400;
-const SAFETY_PIN_BASE = 15650 - EFFECTIVENESS_HANDOFF_OVERLAP;
-const PAGE_REVEAL = 2600;
+const SAFETY_PIN_BASE = 33320;   
+const PAGE_REVEAL = 2600;        
 const STANDARD_BUBBLE_TRAVEL = 2000;
-const PAGE_BUBBLE = STANDARD_BUBBLE_TRAVEL;
-const PAGE_FADE = 1100;
+const PAGE_BUBBLE = STANDARD_BUBBLE_TRAVEL;        
+const PAGE_FADE = 1100;          
 
 const SAFETY_SCENE_DEFS = [
     {
-        id: 'effectiveness-compare', kind: 'compare', revealDist: 1400,
-        transparentLayer: true,
-        fadeBackgroundWithLastBubble: true,
-        backgroundFadeBubbleProgress: 0.80,
-        backgroundFadeDuration: 800,
-        compare: {
-            title: 'The Effectiveness of Vaccination', colour: 'red', hasRange: false,
-            arrowFile: 'arrow1.png', arrowAlt: 'A down arrow showing fewer herpes zoster cases after vaccination',
-            left: { count: 33, mean: 33 },
-            right: { count: 16, mean: 16 }
-        },
-        bubbles: [
-            'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases compared to the placebo group.',
-            'Overall, this study shows that the herpes zoster vaccine appears to prevent the risk of developing it.'
-        ]
-    },
-    {
-        id: 'safety-intro', kind: 'intro-with-bubble', revealDist: 1500,
-        title: 'The <span class="blue">Safety</span> of Vaccination',
-        subtitle: 'How many people experienced a <span class="blue">serious adverse effect</span><br>in the placebo group and in the vaccinated group?',
-        bubbles: [
-            'Serious adverse effects refer to severe outcomes such as death, life-threatening conditions, hospitalisation, disability or permanent damage, congenital anomalies or birth defects, or other important medical events.'
-        ]
-    },
-    {
         id: 'sfa-1', kind: 'chart', revealDist: 420, bubbleStart: 420, bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         chart: { title: 'Serious Adverse Effect<br>in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', mean: 22, hasRange: false },
-        bubbles: ['The study shows that about <span class="purple">22</span> in every 1,000 people who did not receive the vaccine had a serious adverse event.']
+        bubbles: ['The study shows that<br>about <span class="purple">22</span> in every 1000 people<br>who do not receive the vaccine<br>had serious adverse events.']
     },
     {
         id: 'sfa-2', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         chart: { title: 'Serious Adverse Effect<br>in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', mean: 23, hasRange: false },
-        bubbles: ['The study shows that about <span class="purple">23</span> in every 1,000 people who received the vaccine had a serious adverse event.']
+        bubbles: [
+            'The study shows that<br>about <span class="purple">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.',
+            'But how about uncertainty in the study data?'
+        ]
     },
     {
-        id: 'sfa-compare', kind: 'compare', revealDist: 2200, bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+        id: 'sfa-3', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+        chart: { title: 'The Uncertainty Range of Serious Adverse Effect in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', rangeStart: 20, rangeEnd: 24, mean: 22, hasRange: true },
+        bubbles: ['The number of people who experience a<br>serious adverse effect in the placebo group is<br>likely to be between about <span class="purple">20</span> and <span class="purple">24</span><br>in every 1000 people.']
+    },
+    {
+        id: 'sfa-4', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+        chart: { title: 'The Uncertainty Range of Serious Adverse Effect in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', rangeStart: 21, rangeEnd: 26, mean: 23, hasRange: true },
+        bubbles: ['The number of people who experience a<br>serious adverse effect in the vaccinated group<br>is likely to be between about <span class="purple">21</span> and <span class="purple">26</span><br>in every 1000 people.']
+    },
+    {
+        id: 'sfa-5', kind: 'compare', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         compare: {
-            title: 'The Serious Adverse Effect of Vaccination', colour: 'purple', hasRange: false,
-            hideArrow: true,
-            left: { count: 22, mean: 22 },
-            right: { count: 23, mean: 23 }
+            title: 'The Serious Adverse Effect of Vaccination', colour: 'purple',
+            arrowFile: 'arrow2.png', arrowAlt: 'An up arrow showing slightly more serious adverse events after vaccination', hideArrow: true,
+            left: { count: 22, rangeStart: 20, rangeEnd: 24, mean: 22 },
+            right: { count: 23, rangeStart: 21, rangeEnd: 26, mean: 23 }
         },
         bubbles: [
-            'For every 1,000 people, the vaccinated group had an average of <span class="purple">1</span> more serious adverse event than the placebo group.',
+            'For every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event compared to the placebo group.',
+            'The likely ranges overlapped and were close<br>to each other, at <span class="purple">20</span> to <span class="purple">24</span> cases<br>in the placebo group and <span class="purple">21</span> to <span class="purple">26</span> cases<br>in the vaccinated group',
             'Overall, the study shows no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.'
         ]
     },
@@ -2589,27 +3773,28 @@ const SAFETY_SCENE_DEFS = [
         id: 'decision-intro', kind: 'intro',
         overlapBefore: 900,
         title: 'Making a Vaccination <span class="blue">Decision</span>',
-        subtitle: 'How should these study findings be interpreted when making a vaccination decision?'
+        subtitle: 'How should this study findings be interpreted in vaccination decision-making?'
     },
     {
         id: 'decision-conclusion', kind: 'bubbles',
         bubbleSpacing: 1900,
         bubbleTravel: 2300,
         bubbles: [
-            'This study found fewer herpes zoster cases after vaccination, while the average numbers of serious adverse events were similar between the two groups.'
+            'This study shows vaccination prevented the occurrence of herpes zoster, while there was no clear evidence of a difference in serious adverse events between groups.'
         ]
     },
     {
-        id: 'sfa-7', kind: 'closing', bubbleStart: 0,
-        overlapBefore: 720,
+        id: 'sfa-7', kind: 'closing',
+        overlapBefore: 650,
+        bubbleStart: 0,
         revealDist: 1800,
         bgStart: 300,
         bubbleSpacing: 1900,
         bubbleTravel: 2200,
         imageFile: 'own_factors_transparent_highres.png', imageAlt: 'Personal factors for vaccination decision',
         bubbles: [
-            'However, these findings describe average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster influenced by age, immune status, and medical history.',
-            'Vaccination decisions can be better informed by weighing the expected benefits, possible harms, and individual context.'
+            'However, these findings describe average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster influenced by age, immune status, medical history.',
+            'Therefore, vaccination decisions can be better informed by weighing the expected benefits, possible harms, uncertainty, and individual context.'
         ]
     },
     {
@@ -2631,21 +3816,6 @@ const SAFETY_SCENE_DEFS = [
 const PAGE_MESSAGE_REVEAL = 1200;  
 const PAGE_MESSAGE_HOLD = 3500;
 
-function getPinnedBackgroundFadeTiming(def, bubbleBase, bubbleSpacing, bubbleTravel, bubbleCount) {
-    const defaultStart = bubbleBase + (bubbleCount > 0
-        ? (((bubbleCount - 1) * bubbleSpacing) + bubbleTravel)
-        : 0);
-    const lastBubbleStart = bubbleBase + (bubbleCount > 0
-        ? ((bubbleCount - 1) * bubbleSpacing)
-        : 0);
-    const start = def.fadeBackgroundWithLastBubble === true && bubbleCount > 0
-        ? lastBubbleStart + (bubbleTravel * clamp(Number(def.backgroundFadeBubbleProgress) || 0.80, 0, 1))
-        : defaultStart;
-    const duration = Math.max(1, Number(def.backgroundFadeDuration) || PAGE_FADE);
-
-    return { start, duration };
-}
-
 function safetyPageDuration(def) {
     if (def.kind === 'message') {
         return PAGE_MESSAGE_REVEAL + PAGE_MESSAGE_HOLD;
@@ -2661,9 +3831,7 @@ function safetyPageDuration(def) {
         return bubbleRun + 400;
     }
     const base = def.bubbleStart !== undefined ? def.bubbleStart : PAGE_REVEAL;
-    const fadeTiming = getPinnedBackgroundFadeTiming(def, base, bubbleSpacing, bubbleTravel, nB);
-    const bubbleEnd = base + bubbleRun;
-    return Math.max(bubbleEnd, fadeTiming.start + fadeTiming.duration);
+    return base + bubbleRun + PAGE_FADE;
 }
 
 function makeSafetyChart(cfg) {
@@ -2711,27 +3879,18 @@ function makeSafetyCompare(cfg) {
     setBox(vs, 906, 105, 108, 108);
     compare.appendChild(vs);
 
-    const hasRange = cfg.hasRange === true;
     const makeSide = (side, sideClass, left) => {
         const sidePlot = makeElement('div', 'side-plot ' + sideClass);
         setBox(sidePlot, left, 245, 830, 520);
-        const dots = hasRange
-            ? makeDotPlot(side.count, cfg.colour, side.rangeStart, side.rangeEnd)
-            : makeDotPlot(side.count, cfg.colour);
+        const dots = makeDotPlot(side.count, cfg.colour, side.rangeStart, side.rangeEnd);
         dots.classList.add('pin-managed-plot');
         sidePlot.appendChild(dots);
-
-        const mean = makeElement('p', 'mean', '');
+        const mean = makeElement('p', 'mean', `<span class="${cfg.colour}">0~0</span> cases<br>(Mean: <span class="${cfg.colour}">0</span> cases)`);
+        mean.dataset.rangeCountUp = 'true';
+        mean.dataset.rangeStart = String(side.rangeStart);
+        mean.dataset.rangeEnd = String(side.rangeEnd);
         mean.dataset.countUp = String(side.mean);
         mean.dataset.colour = cfg.colour;
-        if (hasRange) {
-            mean.dataset.rangeCountUp = 'true';
-            mean.dataset.rangeStart = String(side.rangeStart);
-            mean.dataset.rangeEnd = String(side.rangeEnd);
-            mean.innerHTML = `<span class="${cfg.colour}">0~0</span> cases<br>(Mean: <span class="${cfg.colour}">0</span> cases)`;
-        } else {
-            mean.innerHTML = `Mean: <span class="${cfg.colour}">0</span> cases`;
-        }
         sidePlot.appendChild(mean);
         return sidePlot;
     };
@@ -2748,25 +3907,14 @@ function makeSafetyCompare(cfg) {
     }
 
     compare.appendChild(makeSide(cfg.right, 'pinned-page-compare-right', 1025));
-    compare.appendChild(makeLegend(cfg.colour, cfg.colour === 'red' ? 'Case of herpes zoster' : 'Case of serious adverse effect', hasRange));
+    compare.appendChild(makeLegend(cfg.colour, 'Case of serious adverse effect', true));
     return compare;
-}
-
-function makePinnedStoryCard(html, extraClass) {
-    const className = ['text-card', extraClass || ''].filter(Boolean).join(' ');
-    const card = makeElement('section', className);
-    card.appendChild(makeElement('p', '', html));
-    card.setAttribute('aria-hidden', 'true');
-    return card;
 }
 
 function buildPinnedPageLayer(def) {
     const layer = makeElement('div', 'pinned-page-layer');
     if (def.kind === 'intro') {
         layer.classList.add('pinned-page-layer--decision-intro');
-    }
-    if (def.transparentLayer === true) {
-        layer.classList.add('pinned-page-layer--transparent');
     }
     layer.dataset.sceneId = def.id;
     const content = makeElement('div', 'pinned-page-content');
@@ -2781,22 +3929,15 @@ function buildPinnedPageLayer(def) {
         setBox(compare, 0, 112, 1920, 850);
         content.appendChild(compare);
         def._bgSelector = '.pinned-page-compare';
-    } else if (def.kind === 'intro' || def.kind === 'intro-with-bubble') {
-        const introClass = def.kind === 'intro-with-bubble' ? 'decision-intro-block safety-intro-block' : 'decision-intro-block';
-        const intro = makeElement('section', introClass);
-        const titleClass = def.kind === 'intro-with-bubble'
-            ? 'title section-title decision-intro-title safety-intro-title'
-            : 'title section-title decision-intro-title';
-        const subtitleClass = def.kind === 'intro-with-bubble'
-            ? 'subtitle decision-intro-subtitle safety-intro-subtitle'
-            : 'subtitle decision-intro-subtitle';
-        const title = makeElement('h2', titleClass, def.title);
+    } else if (def.kind === 'intro') {
+        const intro = makeElement('section', 'decision-intro-block');
+        const title = makeElement('h2', 'title section-title decision-intro-title', def.title);
         intro.appendChild(title);
-        const subtitle = makeElement('p', subtitleClass, def.subtitle);
+        const subtitle = makeElement('p', 'subtitle decision-intro-subtitle', def.subtitle);
         intro.appendChild(subtitle);
         setBox(intro, 260, 0, 1400, 1080);
         content.appendChild(intro);
-        def._bgSelector = def.kind === 'intro-with-bubble' ? '.safety-intro-block' : '.decision-intro-block';
+        def._bgSelector = '.decision-intro-block';
     } else if (def.kind === 'closing') {
         const img = document.createElement('img');
         img.className = 'asset pinned-page-illustration';
@@ -2833,7 +3974,7 @@ function buildPinnedPageLayer(def) {
     }
 
     (def.bubbles || []).forEach((html, i) => {
-        const card = makePinnedStoryCard(html, 'pinned-page-bubble pinned-page-bubble-' + i);
+        const card = makeEffectivenessRangePinnedCard(html, 'pinned-page-bubble pinned-page-bubble-' + i);
         setBox(card, 464, 0, 993, 301);
         content.appendChild(card);
     });
@@ -2912,24 +4053,8 @@ function revealPinnedCompare(compare, p, layerOpacity) {
     });
 
     const countProgress = clamp((p - 0.50) / 0.42, 0, 1);
-    compare.querySelectorAll('.mean[data-count-up]').forEach((mean) => {
-        if (mean.dataset.rangeCountUp === 'true') {
-            setScrollTiedRangeCount(
-                mean,
-                parseInt(mean.dataset.rangeStart, 10),
-                parseInt(mean.dataset.rangeEnd, 10),
-                parseInt(mean.dataset.countUp, 10),
-                mean.dataset.colour,
-                countProgress
-            );
-        } else {
-            setScrollTiedMeanCount(
-                mean,
-                parseInt(mean.dataset.countUp, 10),
-                mean.dataset.colour,
-                countProgress
-            );
-        }
+    compare.querySelectorAll('.mean[data-range-count-up]').forEach((mean) => {
+        setScrollTiedRangeCount(mean, parseInt(mean.dataset.rangeStart, 10), parseInt(mean.dataset.rangeEnd, 10), parseInt(mean.dataset.countUp, 10), mean.dataset.colour, countProgress);
         mean.style.opacity = opacity.toFixed(3);
     });
 
@@ -3006,27 +4131,17 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
     const revealDist = def.revealDist !== undefined ? def.revealDist : PAGE_REVEAL;
     const bubbleSpacing = def.bubbleSpacing !== undefined ? def.bubbleSpacing : PAGE_BUBBLE;
     const bubbleTravel = def.bubbleTravel !== undefined ? def.bubbleTravel : PAGE_BUBBLE;
-    const bgFadeTiming = getPinnedBackgroundFadeTiming(def, bubbleBase, bubbleSpacing, bubbleTravel, nB);
-    const bgFadeStart = bgFadeTiming.start;
-    const bgFadeDuration = bgFadeTiming.duration;
+    const bgFadeStart = bubbleBase + (nB > 0 ? (((nB - 1) * bubbleSpacing) + bubbleTravel) : 0);
 
     if (def.kind !== 'bubbles') {
         const revealP = clamp(scrollDist / revealDist, 0, 1);
         const bg = content.querySelector(def._bgSelector);
-        const bgHold = 1 - clamp((scrollDist - bgFadeStart) / bgFadeDuration, 0, 1);
+        const bgHold = 1 - clamp((scrollDist - bgFadeStart) / PAGE_FADE, 0, 1);
 
         if (def.kind === 'chart') {
             revealPinnedChart(bg, revealP, layerOpacity);
         } else if (def.kind === 'compare') {
             revealPinnedCompare(bg, revealP, layerOpacity);
-        } else if (def.kind === 'intro-with-bubble') {
-            const reveal = smoothStep(0.00, 0.48, revealP);
-            const o = reveal * layerOpacity;
-            if (bg !== null) {
-                bg.style.opacity = o.toFixed(3);
-                bg.style.visibility = o > 0.02 ? 'visible' : 'hidden';
-                bg.style.transform = `translate3d(0, ${lerp(20, 0, reveal).toFixed(1)}px, 0)`;
-            }
         } else if (def.kind === 'closing') {
             const bgStart = def.bgStart || 0;
             const bgRevealP = clamp((scrollDist - bgStart) / revealDist, 0, 1);
@@ -3073,11 +4188,6 @@ function buildSafetyScenes() {
         buildPinnedPageLayer(def);
         cursor = def._top + def._pinDuration;
     });
-
-    const safetyDef = SAFETY_SCENE_DEFS.find((d) => d.id === 'safety-intro');
-    if (safetyDef) {
-        sectionTops.safety = safetyDef._top;
-    }
 
     const closingDef = SAFETY_SCENE_DEFS.find((d) => d.kind === 'closing');
     if (closingDef) {
@@ -3195,11 +4305,18 @@ function applyResponsiveCardSizing() {
     const selector = [
         '.text-card',
         '.pinned-page-bubble',
+        '.effectiveness-range-pinned-card',
         '.effectiveness-pinned-card'
     ].join(', ');
 
     document.querySelectorAll(selector).forEach(function (card) {
-        const responsiveCardW = cardW;
+        const isUncertaintyCard = compact && card.classList.contains('uncertainty-concept-card');
+        const uncertaintyPhysicalWidth = isUncertaintyCard
+            ? clamp(viewportWidth - 116, 260, 340)
+            : desiredPhysicalWidth;
+        const responsiveCardW = isUncertaintyCard
+            ? Math.min(1720, Math.round(uncertaintyPhysicalWidth / pinScale))
+            : cardW;
         const responsiveCardLeft = Math.round((1920 - responsiveCardW) / 2);
 
         card.style.setProperty('width', responsiveCardW + 'px', 'important');
@@ -3303,6 +4420,8 @@ function renderArticle() {
     renderIntro();
     createMobileHeroLayer();
     renderEffectiveness();
+    renderUncertainty();
+    renderEffectivenessRange();
     buildSafetyScenes();
     fillAllPlots();
     setupRevealObserver();
