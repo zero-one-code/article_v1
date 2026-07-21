@@ -1109,7 +1109,7 @@ function makeRiskGroupContent(className, titleTop, imageTop, includeCards) {
     baseImage.className = "risk-base-image";
     baseImage.src = "./assets/people_risk_groups_smooth_highres_transparent.png";
     baseImage.alt = "Risk groups for shingles: older people, people with weakened immunity, and people with some chronic diseases.";
-    setBox(baseImage, 360, imageTop, 1200, 600);
+    setBox(baseImage, 210, imageTop, 1500, 750);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
