@@ -984,7 +984,7 @@ function makeDiseaseDiagramContent(className, titleTop, imageTop, includeCards) 
     baseImage.className = "disease-base-image";
     baseImage.src = "./assets/shingles_diagram_transparent_highres.png";
     baseImage.alt = "Shingles symptoms diagram showing pain, blistering rash, persistent neuralgia, and complications.";
-    setBox(baseImage, 435, imageTop, 1050, 689);
+    setBox(baseImage, 360, imageTop, 1200, 787);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
