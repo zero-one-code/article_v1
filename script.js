@@ -984,7 +984,7 @@ function makeDiseaseDiagramContent(className, titleTop, imageTop, includeCards) 
     baseImage.className = "disease-base-image";
     baseImage.src = "./assets/shingles_diagram_transparent_highres.png";
     baseImage.alt = "Shingles symptoms diagram showing pain, blistering rash, persistent neuralgia, and complications.";
-    setBox(baseImage, 360, imageTop, 1200, 787);
+    setBox(baseImage, 435, imageTop, 1050, 689);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
@@ -1117,7 +1117,7 @@ function makeRiskGroupContent(className, titleTop, imageTop, includeCards) {
     baseImage.className = "risk-base-image";
     baseImage.src = "./assets/people_risk_groups_smooth_highres_transparent.png";
     baseImage.alt = "Risk groups for shingles: older people, people with weakened immunity, and people with some chronic diseases.";
-    setBox(baseImage, 360, imageTop, 1200, 600);
+    setBox(baseImage, 360, imageTop, 1200, 787);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
