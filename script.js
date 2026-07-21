@@ -304,6 +304,12 @@ function updateScale() {
     document.documentElement.style.setProperty("--viewport-width", `${viewportWidth.toFixed(2)}px`);
     document.documentElement.style.setProperty("--viewport-height", `${viewportHeight.toFixed(2)}px`);
 
+    const heroTitleFontSize = 77 * stageScale / Math.max(0.01, pinScale);
+    document.documentElement.style.setProperty(
+        "--hero-title-font-size",
+        `${heroTitleFontSize.toFixed(3)}px`
+    );
+
     const uncertaintyGraphicScale = compact ? 1.32 : 1;
     const uncertaintyRenderedScale = Math.max(0.01, pinScale * uncertaintyGraphicScale);
     const uncertaintyGraphicFont = 12 / uncertaintyRenderedScale;
@@ -1004,7 +1010,7 @@ function createDiseasePinLayer() {
     }
 
     const layer = makeElement("div", "disease-pin-layer");
-    const content = makeDiseaseDiagramContent("disease-pin-content", 160, 220, true);
+    const content = makeDiseaseDiagramContent("disease-pin-content", 160, 260, true);
     layer.appendChild(content);
     document.body.appendChild(layer);
     return layer;
@@ -1022,7 +1028,7 @@ function addDiseaseScrollScene(sectionName, absoluteTop) {
     scene.dataset.pinDuration = String(pinDuration);
     scene.dataset.transitionOutStart = String(transitionOutStart);
 
-    const staticLayer = makeDiseaseDiagramContent("disease-static-layer", 10, 70, false);
+    const staticLayer = makeDiseaseDiagramContent("disease-static-layer", 10, 110, false);
     scene.appendChild(staticLayer);
 
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
@@ -1108,19 +1114,19 @@ function makeRiskGroupContent(className, titleTop, imageTop, includeCards) {
     const baseImage = document.createElement("img");
     baseImage.className = "risk-base-image";
     baseImage.src = "./assets/people_risk_groups_smooth_highres_transparent.png";
-    baseImage.alt = "Risk groups for shingles: older people, and people with weakened immunity, and people with some chronic diseases.";
-    setBox(baseImage, 210, imageTop, 1500, 750);
+    baseImage.alt = "Risk groups for shingles: older people, people with weakened immunity, and people with some chronic diseases.";
+    setBox(baseImage, 360, imageTop, 1200, 600);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
         const firstCard = makeRiskCard(
-            "The risk of developing herpes zoster is higher in adults aged 50 and older, and people with weakened immune systems.",
+            "The risk of developing herpes zoster is higher in adults aged 50 and older, people with weakened immune systems.",
             "risk-card-one"
         );
         wrapper.appendChild(firstCard);
 
         const secondCard = makeRiskCard(
-            "Medical conditions such as diabetes, chronic kidney disease, or lung disease may also increase the risk.",
+            "Stress and medical conditions such as diabetes, chronic kidney disease, or lung disease may also increase the risk.",
             "risk-card-two"
         );
         wrapper.appendChild(secondCard);
@@ -1137,7 +1143,7 @@ function createRiskPinLayer() {
     }
 
     const layer = makeElement("div", "risk-pin-layer");
-    const content = makeRiskGroupContent("risk-pin-content", 72, 124, true);
+    const content = makeRiskGroupContent("risk-pin-content", 72, 194, true);
     layer.appendChild(content);
     document.body.appendChild(layer);
     return layer;
@@ -1155,7 +1161,7 @@ function addRiskScrollScene(sectionName, absoluteTop) {
     scene.dataset.pinDuration = String(pinDuration);
     scene.dataset.transitionOutStart = String(transitionOutStart);
 
-    const staticLayer = makeRiskGroupContent("risk-static-layer", 72, 124, false);
+    const staticLayer = makeRiskGroupContent("risk-static-layer", 72, 194, false);
     scene.appendChild(staticLayer);
 
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
@@ -2278,7 +2284,7 @@ function createReliabilityPinLayer() {
     const layer = makeElement("div", "reliability-pin-layer");
     const content = makeElement("div", "reliability-pin-content");
 
-    const title = makeElement("h2", "title question-title reliability-title", "How certain are the numbers<br>reported by this study?");
+    const title = makeElement("h2", "title question-title reliability-title", "How precise are the numbers<br>reported by this study?");
     setBox(title, 500, 500, 920);
     content.appendChild(title);
 
@@ -2521,12 +2527,12 @@ function createUncertaintyConceptPinLayer() {
     content.appendChild(visual);
 
     const cardCopy = [
-        "In general, studies use a <span class=\"blue\">sample</span> of people rather than the entire population. The sample data are used to calculate an estimate of a population value.",
-        "However, the estimate of the study could vary if different people had taken part, or if the same type of study is carried out again. This variation is one source of <span class=\"blue\">uncertainty in study data</span>.",
-        "Here, the red dot shows the study’s estimate. The grey line behind the dot is a <span class=\"blue\">confidence interval</span>, showing a range of values which likely contains the true population value.",
-        "The estimated range of values helps make statistical uncertainty visible.<br>A narrower range means a more certain estimate, and <br>a wider interval indicates less precision.",
-        "For the charts that follow, consider the whole confidence interval for the difference between the vaccination and placebo groups.",
-        "If the range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
+        "A study observes a <span class=\"blue\">sample</span> of people who take part in the study, not the entire population.",
+        "A different but comparable sample could produce a slightly different estimate.<br>This natural sample-to-sample variation is one source of <span class=\"blue\">uncertainty</span>.",
+        "The dot is the study’s <span class=\"blue\">point estimate</span>, which is a single value calculated from the data. The line shows values reasonably compatible with the data.<br>This range is a <span class=\"blue\">95% confidence interval</span>.",
+        "The interval makes uncertainty visible.<br>A narrower range means a more precise estimate;<br>a wider range means the exact value is less certain.",
+        "For the charts that follow, compare the <span class=\"blue\">full range</span><br>with the placebo result.",
+        "If the whole range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
         "If the range spans the placebo result,<br>the data also allow little or no difference.",
         "So, what uncertainty ranges<br>did this study report?"
     ];
@@ -3407,7 +3413,7 @@ function renderSafety() {
         hasRange: false
     });
     addCard("safety", "The study shows that<br>about <span class=\"purple\">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.", 30695);
-    addCard("safety", "What is the estimated uncertainty range for serious adverse events in the study data?", 31426);
+    addCard("safety", "But how about uncertainty in the study data?", 31426);
 
     addChart("safety", {
         top: 31888,
