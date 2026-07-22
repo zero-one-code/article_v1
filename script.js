@@ -2978,7 +2978,7 @@ function createEffectivenessRangePinLayer() {
     content.appendChild(compareMeanDifferenceCard);
 
     const compareOverallCard = makeEffectivenessRangePinnedCard(
-        '<span class=\"grey\">This indicates</span> the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
+        '<span class=\"grey\">This indicates</span> the herpes zoster vaccine appears to prevent the risk of developing it.',
         'effectiveness-range-pinned-card--compare-overall'
     );
     setBox(compareOverallCard, 464, 0, 993, 301);
