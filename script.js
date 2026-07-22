@@ -263,6 +263,12 @@ function getMatchedPinTopForScale(pinOffset, staticY, pinnedY, targetScale) {
     return (pinOffset * stageScale) + (staticY * stageScale) - (pinnedY * targetScale);
 }
 
+function getMatchedStaticPinTop(pinOffset, staticY, pinnedY) {
+    const stageScale = getScale();
+    const pinScale = getPinScale();
+    return (pinOffset * stageScale) + (staticY * pinScale) - (pinnedY * pinScale);
+}
+
 function addReveal(element, variant) {
     if (prefersReducedMotion) {
         element.classList.add("is-visible");
@@ -300,12 +306,14 @@ function updateScale() {
 
     document.documentElement.style.setProperty("--scale", stageScale.toFixed(5));
     document.documentElement.style.setProperty("--pin-scale", pinScale.toFixed(5));
+    document.documentElement.style.setProperty(
+        "--static-pin-ratio",
+        (pinScale / Math.max(0.01, stageScale)).toFixed(5)
+    );
     document.documentElement.style.setProperty("--pin-offset-y", `${pinOffsetY.toFixed(2)}px`);
     document.documentElement.style.setProperty("--viewport-width", `${viewportWidth.toFixed(2)}px`);
     document.documentElement.style.setProperty("--viewport-height", `${viewportHeight.toFixed(2)}px`);
 
-    // Match the fixed/mobile hero title's rendered size to the title in the
-    // normal scaled canvas. The two layers use different parent scales.
     const heroTitleFontSize = 77 * stageScale / Math.max(0.01, pinScale);
     document.documentElement.style.setProperty(
         "--hero-title-font-size",
@@ -989,13 +997,13 @@ function makeDiseaseDiagramContent(className, titleTop, imageTop, includeCards) 
 
     if (includeCards) {
         const firstCard = makeDiseaseCard(
-            "Herpes zoster, also known as shingles, is caused<br>by the same virus that causes chickenpox. After a<br>person has chickenpox, the virus stays inactive in<br>the nerve cells for many years",
+            "<span class=\"grey\">Herpes zoster, also known as shingles, is</span> caused<br>by the same virus that causes chickenpox.<br><span class=\"grey\">After a person has chickenpox, the virus stays</span> inactive in the nerve cells<span class=\"grey\">, and occurs when the virus</span> reactivates later in life.",
             "disease-card-one"
         );
         wrapper.appendChild(firstCard);
 
         const secondCard = makeDiseaseCard(
-            "It can cause severe pain and a blistering rash. Persistent, often debilitating nerve pain may persist after the rash heals, making it very uncomfortable and affecting one’s daily life. Complications such as vision damage and encephalitis may also remain.",
+            "<span class=\"grey\">It can cause severe</span> pain and a blistering rash. Persistent, often debilitating nerve pain <span class=\"grey\">may persist after the rash heals, making it very uncomfortable and affecting one’s daily life. </span>Complications such as vision damage and encephalitis<span class=\"grey\"> may also remain.</span>",
             "disease-card-two"
         );
         wrapper.appendChild(secondCard);
@@ -1012,7 +1020,7 @@ function createDiseasePinLayer() {
     }
 
     const layer = makeElement("div", "disease-pin-layer");
-    const content = makeDiseaseDiagramContent("disease-pin-content", 160, 260, true);
+    const content = makeDiseaseDiagramContent("disease-pin-content", 10, 110, true);
     layer.appendChild(content);
     document.body.appendChild(layer);
     return layer;
@@ -1039,7 +1047,7 @@ function addDiseaseScrollScene(sectionName, absoluteTop) {
 }
 
 function setDiseaseCardScrollPosition(card, progress) {
-    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -260);
+    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -470);
 }
 
 function updateDiseaseScrolly(currentDesignY) {
@@ -1062,8 +1070,12 @@ function updateDiseaseScrolly(currentDesignY) {
     const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
     const transitionProgress = smoothStep(transitionOutStart, 0.93, overallProgress);
     const contentOpacity = isPinned ? (1 - transitionProgress) : 0;
+    const sceneBottom = sceneTop + parseFloat(scene.dataset.sceneHeight || "0");
+    const shouldKeepStaticHidden = currentDesignY >= pinStart && currentDesignY < sceneBottom;
     const staticLayer = scene.querySelector(".disease-static-layer");
     const content = pinLayer.querySelector(".disease-pin-content");
+    const diseaseTitle = pinLayer.querySelector(".disease-title");
+    const diseaseImage = pinLayer.querySelector(".disease-base-image");
     const firstCard = pinLayer.querySelector(".disease-card-one");
     const secondCard = pinLayer.querySelector(".disease-card-two");
 
@@ -1076,16 +1088,34 @@ function updateDiseaseScrolly(currentDesignY) {
             content.style.top = `${Math.round(getPinOffsetY())}px`;
             content.style.transform = "translate3d(-50%, 0, 0) scale(var(--pin-scale))";
         } else {
-            const diseaseScale = getScale();
-            content.style.top = `${Math.round(getMatchedPinTopForScale(pinOffset, 10, 160, diseaseScale))}px`;
-            content.style.transform = "translateX(-50%) scale(var(--scale))";
+            content.style.top =
+                `${Math.round(
+                    getMatchedStaticPinTop(
+                        pinOffset,
+                        10,
+                        10
+                    )
+                )}px`;
+
+            content.style.transform =
+                "translate3d(-50%, 0, 0) scale(var(--pin-scale))";
         }
         content.style.opacity = contentOpacity.toFixed(3);
-        content.style.filter = `blur(${diseaseBlur.toFixed(2)}px)`;
+        content.style.filter = "none";
+
+        if (diseaseTitle !== null) {
+            diseaseTitle.style.filter = `blur(${diseaseBlur.toFixed(2)}px)`;
+        }
+        if (diseaseImage !== null) {
+            diseaseImage.style.filter = `blur(${diseaseBlur.toFixed(2)}px)`;
+            diseaseImage.style.transform = `scale(${getMobileBackgroundScale().toFixed(4)})`;
+            diseaseImage.style.transformOrigin = "center center";
+        }
     }
 
     if (staticLayer !== null) {
-        staticLayer.classList.toggle("is-hidden", isPinned);
+        staticLayer.classList.toggle("is-hidden", shouldKeepStaticHidden);
+        staticLayer.style.opacity = shouldKeepStaticHidden ? "0" : "1";
     }
 
     if (firstCard !== null) {
@@ -1116,19 +1146,19 @@ function makeRiskGroupContent(className, titleTop, imageTop, includeCards) {
     const baseImage = document.createElement("img");
     baseImage.className = "risk-base-image";
     baseImage.src = "./assets/people_risk_groups_smooth_highres_transparent.png";
-    baseImage.alt = "Risk groups for shingles: older people, people with weakened immunity, and people with some chronic diseases.";
+    baseImage.alt = "The risk of developing herpes zoster is higher in adults aged 50 and older, and people with weakened immune systems.";
     setBox(baseImage, 360, imageTop, 1200, 787);
     wrapper.appendChild(baseImage);
 
     if (includeCards) {
         const firstCard = makeRiskCard(
-            "The risk of developing herpes zoster is higher in adults aged 50 and older, people with weakened immune systems.",
+            "<span class=\"grey\">The risk of developing herpes zoster is</span> higher in adults aged 50 and older, and people with weakened immune systems.",
             "risk-card-one"
         );
         wrapper.appendChild(firstCard);
 
         const secondCard = makeRiskCard(
-            "Stress and medical conditions such as diabetes, chronic kidney disease, or lung disease may also increase the risk.",
+            "Medical conditions such as diabetes, chronic kidney disease, or lung disease<span class=\"grey\"> may also increase the risk.</span>",
             "risk-card-two"
         );
         wrapper.appendChild(secondCard);
@@ -1172,7 +1202,7 @@ function addRiskScrollScene(sectionName, absoluteTop) {
 }
 
 function setRiskCardScrollPosition(card, progress) {
-    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -340);
+    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -470);
 }
 
 function updateRiskScrolly(currentDesignY) {
@@ -1248,7 +1278,7 @@ function updateRiskScrolly(currentDesignY) {
         const incomingBlur = lerp(5.5, 0, Math.min(riskHandoffOpacity, riskFadeIn));
         content.style.top = isMobileLayout()
             ? `${Math.round(getPinOffsetY())}px`
-            : `${Math.round(getMatchedPinTop(pinOffset, 72, 72))}px`;
+            : `${Math.round(getMatchedStaticPinTop(pinOffset, 72, 72))}px`;
         content.style.opacity = riskOpacity.toFixed(3);
         content.style.transform = `translate3d(-50%, ${enterY + exitY}px, 0) scale(var(--pin-scale))`;
 
@@ -1357,20 +1387,20 @@ function createVaccinePinLayer() {
     content.appendChild(plots);
 
     const sourceCard = makeVaccineCard(
-        "Here, we walk through data from several studies on the effectiveness and safety of the herpes zoster vaccine in adults aged 60 years and older over a period of 3.1 years.",
+        "<span class=\"grey\">Here, we</span> walk through study data on the effectiveness and safety of the herpes zoster vaccine<span class=\"grey\"> in adults aged 60 years and older over a period of 3.1 years.</span>",
         "vaccine-card-source",
         "Source: Cochrane Database of Systematic reviews (2023)"
     );
     content.appendChild(sourceCard);
 
     const comparisonCard = makeVaccineCard(
-        "This data compares the number of herpes zoster cases and serious adverse effects between the vaccine group and the placebo group who did not receive the actual vaccine but were given a harmless substance.",
+        "<span class=\"grey\">This data</span> compares the number of herpes zoster cases<span class=\"grey\"> and</span> serious adverse effects between the vaccine group and the placebo group<span class=\"grey\"> who did not receive the actual vaccine but were given a harmless substance.</span>",
         "vaccine-card-comparison"
     );
     content.appendChild(comparisonCard);
 
     const comparisonDetailCard = makeVaccineCard(
-        "The clinical trial findings are shown as the number of people affected per 1000 participants, to facilitate comparison between the vaccine and placebo groups.",
+        "<span class=\"grey\">The clinical trial findings are</span> shown as the number of people affected per 1000 participants<span class=\"grey\">, to facilitate comparison between the vaccine and placebo groups.</span>",
         "vaccine-card-detail"
     );
     content.appendChild(comparisonDetailCard);
@@ -1622,14 +1652,14 @@ function createEffectivenessPinLayer() {
     content.appendChild(placeboChart);
 
     const placeboCard = makeEffectivenessPinnedCard(
-        "The study suggests that among people who do not receive the vaccine, about <span class=\"red\">33</span> per 1000 may develop herpes zoster.",
+        "<span class=\"grey\">The study suggests that</span> among people who do not receive the vaccine, about <span class=\"red\">33</span> per 1000<span class=\"grey\"> developed herpes zoster.</span>",
         "effectiveness-placebo-card"
     );
     content.appendChild(placeboCard);
 
 
     const vaccinatedCard = makeEffectivenessPinnedCard(
-        "It was estimated that about <span class=\"red\">16</span> out of every 1000 people who receive the vaccine would develop herpes zoster.",
+        "<span class=\"grey\">It was estimated that</span> about <span class=\"red\">16</span> out of every 1000 people who receive the vaccine<span class=\"grey\"> developed herpes zoster.</span>",
         "effectiveness-vaccinated-card"
     );
     content.appendChild(vaccinatedCard);
@@ -2286,7 +2316,7 @@ function createReliabilityPinLayer() {
     const layer = makeElement("div", "reliability-pin-layer");
     const content = makeElement("div", "reliability-pin-content");
 
-    const title = makeElement("h2", "title question-title reliability-title", "How precise are the numbers<br>reported by this study?");
+    const title = makeElement("h2", "title question-title reliability-title", "How certain are the numbers<br>reported by this study?");
     setBox(title, 500, 500, 920);
     content.appendChild(title);
 
@@ -2399,19 +2429,19 @@ function createUncertaintyConceptPinLayer() {
     const sourceFlow = makeElement("div", "uncertainty-concept-source-flow");
     const population = makeElement("div", "uncertainty-concept-population");
     population.appendChild(makeConceptPeopleCluster(30, "uncertainty-concept-population-people"));
-    population.appendChild(makeElement("span", "uncertainty-concept-flow-label", "The entire population"));
+    population.appendChild(makeElement("span", "uncertainty-concept-flow-label", "Population"));
     sourceFlow.appendChild(population);
     sourceFlow.appendChild(makeElement("span", "uncertainty-concept-arrow", "→"));
 
     const sample = makeElement("div", "uncertainty-concept-sample");
     sample.appendChild(makeConceptPeopleCluster(8, "uncertainty-concept-sample-people"));
-    sample.appendChild(makeElement("span", "uncertainty-concept-flow-label", "study sample"));
+    sample.appendChild(makeElement("span", "uncertainty-concept-flow-label", "Sample"));
     sourceFlow.appendChild(sample);
     sourceFlow.appendChild(makeElement("span", "uncertainty-concept-arrow uncertainty-concept-arrow-last", "→"));
 
     const flowEstimate = makeElement("div", "uncertainty-concept-flow-estimate");
     flowEstimate.appendChild(makeElement("span", "uncertainty-concept-flow-estimate-dot"));
-    flowEstimate.appendChild(makeElement("span", "uncertainty-concept-flow-label", "one estimate"));
+    flowEstimate.appendChild(makeElement("span", "uncertainty-concept-flow-label", "Estimate"));
     sourceFlow.appendChild(flowEstimate);
     visual.appendChild(sourceFlow);
 
@@ -2465,7 +2495,7 @@ function createUncertaintyConceptPinLayer() {
     const estimateDot = makeElement("span", "uncertainty-concept-estimate-dot");
     estimateDot.setAttribute("aria-hidden", "true");
     axis.appendChild(estimateDot);
-    axis.appendChild(makeElement("span", "uncertainty-concept-estimate-label", "point estimate"));
+    axis.appendChild(makeElement("span", "uncertainty-concept-estimate-label", "Study estimate"));
     axis.appendChild(makeElement("span", "uncertainty-concept-range-label", "95% confidence interval"));
     const intervalNoteStack = makeElement("div", "uncertainty-concept-interval-note-stack");
     intervalNoteStack.appendChild(makeElement(
@@ -2496,46 +2526,37 @@ function createUncertaintyConceptPinLayer() {
         panel.appendChild(makeElement("p", "uncertainty-concept-precision-subtitle", subtitle));
         return panel;
     };
-    precisionStage.appendChild(makePrecisionPanel("narrow", "Narrower range", "more precise estimate", 36, 28));
-    precisionStage.appendChild(makePrecisionPanel("wide", "Wider range", "exact value is less certain", 18, 64));
+    precisionStage.appendChild(makePrecisionPanel("narrow", "Narrower range", "more certain estimate", 36, 28));
+    precisionStage.appendChild(makePrecisionPanel("wide", "Wider range", "less certain estimate", 18, 64));
     visual.appendChild(precisionStage);
 
     const interpretationStage = makeElement("section", "uncertainty-concept-interpretation-stage");
-    interpretationStage.appendChild(makeElement(
-        "h3",
-        "uncertainty-concept-interpretation-heading",
-        "Compare the full range with the placebo result"
-    ));
-    const interpretationChart = makeElement("div", "uncertainty-concept-interpretation-chart");
-    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-axis"));
-    const reference = makeElement("span", "uncertainty-concept-placebo-reference");
-    reference.appendChild(makeElement("span", "uncertainty-concept-placebo-reference-label", "placebo result"));
-    interpretationChart.appendChild(reference);
-    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-band"));
-    interpretationChart.appendChild(makeElement("span", "uncertainty-concept-interpretation-dot"));
+    const interpretationChart = makeElement("div", "uncertainty-concept-group-compare-chart");
+    const makeGroupCompareRow = (rowClass, labelText) => {
+        const row = makeElement("div", `uncertainty-concept-group-compare-row ${rowClass}`);
+        row.appendChild(makeElement("span", "uncertainty-concept-group-compare-label", labelText));
+        const track = makeElement("span", "uncertainty-concept-group-compare-track");
+        track.appendChild(makeElement("span", "uncertainty-concept-group-compare-axis"));
+        track.appendChild(makeElement("span", "uncertainty-concept-group-compare-band"));
+        track.appendChild(makeElement("span", "uncertainty-concept-group-compare-dot"));
+        row.appendChild(track);
+        return row;
+    };
+    interpretationChart.appendChild(makeGroupCompareRow("is-a", "Group A"));
+    interpretationChart.appendChild(makeGroupCompareRow("is-b", "Group B"));
     interpretationStage.appendChild(interpretationChart);
-    interpretationStage.appendChild(makeElement(
-        "p",
-        "uncertainty-concept-interpretation-status is-below",
-        "The whole range stays below the placebo result:<br><strong>all values still indicate fewer cases with vaccination.</strong>"
-    ));
-    interpretationStage.appendChild(makeElement(
-        "p",
-        "uncertainty-concept-interpretation-status is-spans",
-        "The range spans the placebo result:<br><strong>the data also allow little or no difference.</strong>"
-    ));
     visual.appendChild(interpretationStage);
 
     content.appendChild(visual);
 
     const cardCopy = [
-        "A study observes a <span class=\"blue\">sample</span> of people who take part in the study, not the entire population.",
-        "A different but comparable sample could produce a slightly different estimate.<br>This natural sample-to-sample variation is one source of <span class=\"blue\">uncertainty</span>.",
-        "The dot is the study’s <span class=\"blue\">point estimate</span>, which is a single value calculated from the data. The line shows values reasonably compatible with the data.<br>This range is a <span class=\"blue\">95% confidence interval</span>.",
-        "The interval makes uncertainty visible.<br>A narrower range means a more precise estimate;<br>a wider range means the exact value is less certain.",
-        "For the charts that follow, compare the <span class=\"blue\">full range</span><br>with the placebo result.",
-        "If the whole range stays below the placebo result,<br>all values still indicate fewer cases with vaccination.",
-        "If the range spans the placebo result,<br>the data also allow little or no difference.",
+        "A study observes a sample of people<span class=\"grey\"> which is chosen to represent the whole population in research. A sample mean is calcluated from it, and</span> used as an estimate for the entire population's actual average.",
+        "<span class=\"grey\">Different but comparable samples could produce slightly different estimates. This</span> sample-to-sample variation is one source of uncertainty.",
+        "<span class=\"grey\">The red dot is the study’s estimate. The grey line shows</span> a range of plausible values that contain the true population mean, which indicates a <span class=\"blue\">confidence interval</span>.",
+        "The range makes uncertainty visible. A narrower range indicates that an estimate is more certain<span class=\"grey\">, and a wider range can be interpreted as one that is less certain.</span>",
+        "<span class=\"grey\">And when</span> comparing the study's result between different groups with uncertain ranges and estimates, <span class=\"grey\">you can interpret it as follows:</span>",
+        "<span class=\"grey\">For example, if Group A’s range lies entirely below Group B’s one, and </span>the uncertainty ranges do not overlap, <span class=\"grey\">this indicates fewer cases in Group A and</span> a considerable difference between the groups.",
+        "<span class=\"grey\">However, if</span> the ranges overlap, <span class=\"grey\">both groups may be compatible with some of the same values, </span>making the difference between them less clear.",
         "So, what uncertainty ranges<br>did this study report?"
     ];
     cardCopy.forEach((html, index) => content.appendChild(makeUncertaintyConceptCard(html, index)));
@@ -2596,10 +2617,12 @@ function updateUncertaintyConceptScrolly(currentDesignY) {
     const precisionStage = pinLayer.querySelector(".uncertainty-concept-precision-comparison-stage");
     const precisionPanels = pinLayer.querySelectorAll(".uncertainty-concept-precision-panel");
     const interpretationStage = pinLayer.querySelector(".uncertainty-concept-interpretation-stage");
-    const interpretationBand = pinLayer.querySelector(".uncertainty-concept-interpretation-band");
-    const interpretationDot = pinLayer.querySelector(".uncertainty-concept-interpretation-dot");
-    const belowStatus = pinLayer.querySelector(".uncertainty-concept-interpretation-status.is-below");
-    const spansStatus = pinLayer.querySelector(".uncertainty-concept-interpretation-status.is-spans");
+    const groupARow = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-a");
+    const groupABand = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-a .uncertainty-concept-group-compare-band");
+    const groupADot = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-a .uncertainty-concept-group-compare-dot");
+    const groupBRow = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-b");
+    const groupBBand = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-b .uncertainty-concept-group-compare-band");
+    const groupBDot = pinLayer.querySelector(".uncertainty-concept-group-compare-row.is-b .uncertainty-concept-group-compare-dot");
 
     const windowOpacity = (inStart, inEnd, outStart, outEnd) => (
         smoothStep(inStart, inEnd, progress) * (1 - smoothStep(outStart, outEnd, progress))
@@ -2697,27 +2720,49 @@ function updateUncertaintyConceptScrolly(currentDesignY) {
     });
 
     if (interpretationStage !== null) {
-        const opacity = windowOpacity(0.660, 0.690, 0.900, 0.930);
+        const opacity = windowOpacity(0.670, 0.700, 0.900, 0.930);
         interpretationStage.style.opacity = opacity.toFixed(3);
-        interpretationStage.style.transform = `translate3d(0, ${lerp(22, 0, smoothStep(0.660, 0.710, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
+        interpretationStage.style.transform = `translate3d(0, ${lerp(26, 0, smoothStep(0.670, 0.720, progress)).toFixed(1)}px, 0) scale(${conceptGraphicScale})`;
     }
 
-    const morph = smoothStep(0.805, 0.840, progress);
-    if (interpretationBand !== null) {
-        const left = lerp(18, 48, morph);
-        const width = lerp(34, 42, morph);
-        interpretationBand.style.left = `${left}%`;
-        interpretationBand.style.width = `${width}%`;
-    }
-    if (interpretationDot !== null) {
-        interpretationDot.style.left = `${lerp(35, 64, morph)}%`;
-    }
-    if (belowStatus !== null) {
-        belowStatus.style.opacity = windowOpacity(0.715, 0.740, 0.795, 0.820).toFixed(3);
-    }
-    if (spansStatus !== null) {
-        spansStatus.style.opacity = windowOpacity(0.835, 0.855, 0.900, 0.925).toFixed(3);
-    }
+    const morph = smoothStep(0.805, 0.845, progress);
+    const chartReveal = smoothStep(0.690, 0.735, progress) * (1 - smoothStep(0.900, 0.930, progress));
+    const setGroupRowState = (rowElement, bandElement, dotElement, fromState, toState, index) => {
+        const rowReveal = chartReveal * smoothStep(0.695 + (index * 0.018), 0.730 + (index * 0.018), progress);
+        if (rowElement !== null) {
+            rowElement.style.opacity = rowReveal.toFixed(3);
+            rowElement.style.transform = `translate3d(0, ${lerp(18, 0, rowReveal).toFixed(1)}px, 0)`;
+        }
+        if (bandElement !== null) {
+            const left = lerp(fromState.left, toState.left, morph);
+            const width = lerp(fromState.width, toState.width, morph);
+            bandElement.style.left = `${left}%`;
+            bandElement.style.width = `${width}%`;
+            bandElement.style.opacity = rowReveal.toFixed(3);
+            bandElement.style.transform = `scaleX(${Math.max(0.001, rowReveal).toFixed(3)})`;
+        }
+        if (dotElement !== null) {
+            dotElement.style.left = `${lerp(fromState.dot, toState.dot, morph)}%`;
+            dotElement.style.opacity = rowReveal.toFixed(3);
+            dotElement.style.transform = `translateX(-50%) scale(${lerp(0.82, 1, rowReveal).toFixed(3)})`;
+        }
+    };
+    setGroupRowState(
+        groupARow,
+        groupABand,
+        groupADot,
+        { left: 8, width: 39, dot: 27 },
+        { left: 49, width: 44, dot: 72 },
+        0
+    );
+    setGroupRowState(
+        groupBRow,
+        groupBBand,
+        groupBDot,
+        { left: 60, width: 35, dot: 78 },
+        { left: 54, width: 42, dot: 77 },
+        1
+    );
 
     const cardWindows = [
         [0.015, 0.035, 0.135, 0.160],
@@ -2901,14 +2946,14 @@ function createEffectivenessRangePinLayer() {
     content.appendChild(vaccinatedChart);
 
     const placeboCard = makeEffectivenessRangePinnedCard(
-        'The number of people who get herpes zoster in the placebo group is likely between <span class="red">30</span> and <span class="red">36</span> people in every 1000 people.',
+        '<span class=\"grey\">The number of people who get herpes zoster in the placebo group is likely</span> between <span class="red">30</span> and <span class="red">36</span> people in every 1000 people.',
         'effectiveness-range-pinned-card--placebo'
     );
     setBox(placeboCard, 464, 0, 993, 301);
     content.appendChild(placeboCard);
 
     const vaccinatedCard = makeEffectivenessRangePinnedCard(
-        'The number of people who get herpes zoster in the vaccinated group is likely between <span class="red">14</span> and <span class="red">19</span> people in every 1000 people.',
+        '<span class=\"grey\">The number of people who get herpes zoster in the vaccinated group is likely</span> between <span class="red">14</span> and <span class="red">19</span> people in every 1000 people.',
         'effectiveness-range-pinned-card--vaccinated'
     );
     setBox(vaccinatedCard, 464, 0, 993, 301);
@@ -2919,21 +2964,21 @@ function createEffectivenessRangePinLayer() {
     content.appendChild(compare);
 
     const compareLowerCard = makeEffectivenessRangePinnedCard(
-        'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases compared to the placebo group.',
+        'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases <span class=\"grey\">compared to the placebo group.</span>',
         'effectiveness-range-pinned-card--compare-lower'
     );
     setBox(compareLowerCard, 464, 0, 993, 301);
     content.appendChild(compareLowerCard);
 
     const compareMeanDifferenceCard = makeEffectivenessRangePinnedCard(
-        'The most likely range is lower in the vaccinated group at <span class="red">14</span> to <span class="red">19</span> cases per 1000 people, compared with <span class="red">30</span> to <span class="red">36</span> in the placebo group.',
+        'The most likely range is lower in the vaccinated group at <span class="red">14</span> to <span class="red">19</span> cases per 1000 people, <span class=\"grey\">compared with 30 to 36 in the placebo group.</span>',
         'effectiveness-range-pinned-card--mean-difference'
     );
     setBox(compareMeanDifferenceCard, 464, 0, 993, 301);
     content.appendChild(compareMeanDifferenceCard);
 
     const compareOverallCard = makeEffectivenessRangePinnedCard(
-        'Overall, this study shows that the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
+        '<span class=\"grey\">Overall, this study shows that</span> the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
         'effectiveness-range-pinned-card--compare-overall'
     );
     setBox(compareOverallCard, 464, 0, 993, 301);
@@ -2941,13 +2986,13 @@ function createEffectivenessRangePinLayer() {
 
     const safetyIntro = makeElement('div', 'effectiveness-range-safety-intro');
     const safetyIntroTitle = makeElement('h2', 'title section-title', 'The <span class="blue">Safety</span> of Vaccination');
-    const safetyIntroSub = makeElement('p', 'subtitle', 'How many people experienced a <span class="blue">serious adverse effect</span><br>in the placebo group and in the vaccinated group?');
+    const safetyIntroSub = makeElement('p', 'subtitle', 'How many people experienced a <span class="blue">serious adverse event</span><br>in the placebo group and in the vaccinated group?');
     safetyIntro.appendChild(safetyIntroTitle);
     safetyIntro.appendChild(safetyIntroSub);
     setBox(safetyIntro, 260, 0, 1400, 1080);
     content.appendChild(safetyIntro);
 
-    const safetyInfoCard = makeEffectivenessRangePinnedCard('Serious adverse effects refer to severe outcomes such as death, life-threatening conditions, hospitalisation, disability or permanent damage, congenital anomalies/birth defects, required intervention to prevent permanent impairment or damage, or other important medical events.', 'effectiveness-range-safety-info-card');
+    const safetyInfoCard = makeEffectivenessRangePinnedCard('Serious adverse events refer to severe outcomes such as death, life-threatening conditions, <span class="grey">hospitalisation, disability or permanent damage, congenital anomalies/birth defects, required intervention to prevent permanent impairment or damage, </span>or other important medical events.', 'effectiveness-range-safety-info-card');
     setBox(safetyInfoCard, 464, 0, 993, 301);
     content.appendChild(safetyInfoCard);
 
@@ -3396,60 +3441,60 @@ function renderSafety() {
     addChart("safety", {
         top: 28306,
         className: 'safety-first-chart',
-        title: "Serious Adverse Effect<br>in the <span class=\"blue\">Placebo</span> Group",
+        title: "Serious Adverse Event<br>in the <span class=\"blue\">Placebo</span> Group",
         count: 22,
         colour: "purple",
         mean: "Mean: <span class=\"purple\">22</span> cases",
-        legend: "Case of serious adverse effect",
+        legend: "Case of serious adverse event",
         hasRange: false
     });
-    addCard("safety", "The study shows that about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 29155);
+    addCard("safety", "<span class=\"purple\">The study shows that</span> about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 29155);
 
     addChart("safety", {
         top: 29810,
-        title: "Serious Adverse Effect<br>in the <span class=\"blue\">Vaccinated</span> Group",
+        title: "Serious Adverse Event<br>in the <span class=\"blue\">Vaccinated</span> Group",
         count: 23,
         colour: "purple",
         mean: "Mean: <span class=\"purple\">23</span> cases",
-        legend: "Case of serious adverse effect",
+        legend: "Case of serious adverse event",
         hasRange: false
     });
-    addCard("safety", "The study shows that<br>about <span class=\"purple\">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.", 30695);
+    addCard("safety", "The study shows that about <span class=\"purple\">23</span> in every 1000 people who receive the vaccine<br>had serious adverse events.", 30695);
     addCard("safety", "But how about uncertainty in the study data?", 31426);
 
     addChart("safety", {
         top: 31888,
-        title: "The Uncertainty Range of Serious Adverse Effect in the <span class=\"blue\">Placebo</span> Group",
+        title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Placebo</span> Group",
         count: 22,
         colour: "purple",
         rangeStart: 20,
         rangeEnd: 24,
         mean: "<span class=\"purple\">20~24</span> cases<br>(Mean: <span class=\"purple\">22</span> cases)",
-        legend: "Case of serious adverse effect",
+        legend: "Case of serious adverse event",
         hasRange: true
     });
-    addCard("safety", "The number of people who experience a serious adverse effect in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 32779);
+    addCard("safety", "The number of people who experience a serious adverse event in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 32779);
 
     addChart("safety", {
         top: 33466,
-        title: "The Uncertainty Range of Serious Adverse Effect in the <span class=\"blue\">Vaccinated</span> Group",
+        title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Vaccinated</span> Group",
         count: 23,
         colour: "purple",
         rangeStart: 21,
         rangeEnd: 26,
         mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)",
-        legend: "Case of serious adverse effect",
+        legend: "Case of serious adverse event",
         hasRange: true
     });
-    addCard("safety", "The number of people who experience a serious adverse effect in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 34356);
+    addCard("safety", "The number of people who experience a serious adverse event in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 34356);
 
     addCompare("safety", {
         top: 35042,
-        title: "The Serious Adverse Effect of Vaccination",
+        title: "The Serious Adverse Event of Vaccination",
         colour: "purple",
         arrowFile: "arrow2.png",
         arrowAlt: "An up arrow showing slightly more serious adverse events after vaccination",
-        legend: "Case of serious adverse effect",
+        legend: "Case of serious adverse event",
         left: {
             count: 22,
             rangeStart: 20,
@@ -3742,39 +3787,39 @@ const PAGE_FADE = 1100;
 const SAFETY_SCENE_DEFS = [
     {
         id: 'sfa-1', kind: 'chart', revealDist: 420, bubbleStart: 420, bubbleTravel: STANDARD_BUBBLE_TRAVEL,
-        chart: { title: 'Serious Adverse Effect<br>in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', mean: 22, hasRange: false },
-        bubbles: ['The study shows that<br>about <span class="purple">22</span> in every 1000 people<br>who do not receive the vaccine<br>had serious adverse events.']
+        chart: { title: 'Serious Adverse Event<br>in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', mean: 22, hasRange: false },
+        bubbles: ['<span class="grey">The study shows that</span> about <span class="purple">22</span> in every 1000 people<br>who do not receive the vaccine<span class="grey"> would experience serious adverse events.</span>']
     },
     {
         id: 'sfa-2', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
-        chart: { title: 'Serious Adverse Effect<br>in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', mean: 23, hasRange: false },
+        chart: { title: 'Serious Adverse Event<br>in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', mean: 23, hasRange: false },
         bubbles: [
-            'The study shows that<br>about <span class="purple">23</span> in every 1000 people<br>who receive the vaccine<br>had serious adverse events.',
+            '<span class="grey">The study shows that</span> about <span class="purple">23</span> in every 1000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>',
             'But how about uncertainty in the study data?'
         ]
     },
     {
         id: 'sfa-3', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
-        chart: { title: 'The Uncertainty Range of Serious Adverse Effect in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', rangeStart: 20, rangeEnd: 24, mean: 22, hasRange: true },
-        bubbles: ['The number of people who experience a<br>serious adverse effect in the placebo group is<br>likely to be between about <span class="purple">20</span> and <span class="purple">24</span><br>in every 1000 people.']
+        chart: { title: 'The Uncertainty Range of Serious Adverse Event in the <span class="blue">Placebo</span> Group', count: 22, colour: 'purple', rangeStart: 20, rangeEnd: 24, mean: 22, hasRange: true },
+        bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the placebo group is likely to be</span> between about <span class="purple">20</span> and <span class="purple">24</span> in every 1000 people.']
     },
     {
         id: 'sfa-4', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
-        chart: { title: 'The Uncertainty Range of Serious Adverse Effect in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', rangeStart: 21, rangeEnd: 26, mean: 23, hasRange: true },
-        bubbles: ['The number of people who experience a<br>serious adverse effect in the vaccinated group<br>is likely to be between about <span class="purple">21</span> and <span class="purple">26</span><br>in every 1000 people.']
+        chart: { title: 'The Uncertainty Range of Serious Adverse Event in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', rangeStart: 21, rangeEnd: 26, mean: 23, hasRange: true },
+        bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the vaccinated group is likely to be</span> between about <span class="purple">21</span> and <span class="purple">26</span>in every 1000 people.']
     },
     {
         id: 'sfa-5', kind: 'compare', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         compare: {
-            title: 'The Serious Adverse Effect of Vaccination', colour: 'purple',
+            title: 'The Serious Adverse Event of Vaccination', colour: 'purple',
             arrowFile: 'arrow2.png', arrowAlt: 'An up arrow showing slightly more serious adverse events after vaccination', hideArrow: true,
             left: { count: 22, rangeStart: 20, rangeEnd: 24, mean: 22 },
             right: { count: 23, rangeStart: 21, rangeEnd: 26, mean: 23 }
         },
         bubbles: [
-            'For every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event compared to the placebo group.',
-            'The likely ranges overlapped and were close<br>to each other, at <span class="purple">20</span> to <span class="purple">24</span> cases<br>in the placebo group and <span class="purple">21</span> to <span class="purple">26</span> cases<br>in the vaccinated group',
-            'Overall, the study shows no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.'
+            'So for every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event <span class="grey">compared to the placebo group.</span>',
+            'The likely ranges overlapped<span class="grey"> and were close to each other,</span> at <span class="purple">20</span> to <span class="purple">24</span> cases in the placebo group and <span class="purple">21</span> to <span class="purple">26</span> cases in the vaccinated group.',
+            '<span class="grey">Overall, the study shows</span> no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.'
         ]
     },
     {
@@ -3788,7 +3833,7 @@ const SAFETY_SCENE_DEFS = [
         bubbleSpacing: 1900,
         bubbleTravel: 2300,
         bubbles: [
-            'This study shows vaccination prevented the occurrence of herpes zoster, while there was no clear evidence of a difference in serious adverse events between groups.'
+            '<span class="grey">This study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while there was</span> no clear evidence of a difference in serious adverse events between groups.'
         ]
     },
     {
@@ -3801,8 +3846,8 @@ const SAFETY_SCENE_DEFS = [
         bubbleTravel: 2200,
         imageFile: 'own_factors_transparent_highres.png', imageAlt: 'Personal factors for vaccination decision',
         bubbles: [
-            'However, these findings describe average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster influenced by age, immune status, medical history.',
-            'Therefore, vaccination decisions can be better informed by weighing the expected benefits, possible harms, uncertainty, and individual context.'
+            '<span class="grey">However, these findings describe</span> average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster <span class="grey">influenced by age, immune status, medical history.</span>',
+            '<span class="grey">Therefore, vaccination decisions can be better informed by</span> weighing the expected benefits, possible harms, uncertainty, and individual context.'
         ]
     },
     {
@@ -3864,7 +3909,7 @@ function makeSafetyChart(cfg) {
         mean.innerHTML = `Mean: <span class="${cfg.colour}">0</span> cases`;
     }
     chart.appendChild(mean);
-    chart.appendChild(makeLegend(cfg.colour, 'Case of serious adverse effect', !!cfg.hasRange));
+    chart.appendChild(makeLegend(cfg.colour, 'Case of serious adverse event', !!cfg.hasRange));
     return chart;
 }
 
@@ -3915,7 +3960,7 @@ function makeSafetyCompare(cfg) {
     }
 
     compare.appendChild(makeSide(cfg.right, 'pinned-page-compare-right', 1025));
-    compare.appendChild(makeLegend(cfg.colour, 'Case of serious adverse effect', true));
+    compare.appendChild(makeLegend(cfg.colour, 'Case of serious adverse event', true));
     return compare;
 }
 
