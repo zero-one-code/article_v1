@@ -3794,7 +3794,7 @@ const SAFETY_SCENE_DEFS = [
         id: 'sfa-2', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         chart: { title: 'Serious Adverse Event<br>in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', mean: 23, hasRange: false },
         bubbles: [
-            '<span class="grey">The study shows that</span> about <span class="purple">23</span> in every 1000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>',
+            'About <span class="purple">23</span> in every 1000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>',
             'But how about uncertainty in the study data?'
         ]
     },
