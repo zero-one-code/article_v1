@@ -3806,7 +3806,7 @@ const SAFETY_SCENE_DEFS = [
     {
         id: 'sfa-4', kind: 'chart', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         chart: { title: 'The Uncertainty Range of Serious Adverse Event in the <span class="blue">Vaccinated</span> Group', count: 23, colour: 'purple', rangeStart: 21, rangeEnd: 26, mean: 23, hasRange: true },
-        bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the vaccinated group is likely to be</span> between about <span class="purple">21</span> and <span class="purple">26</span>in every 1000 people.']
+        bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the vaccinated group is likely to be</span> between about <span class="purple">21</span> and <span class="purple">26</span> in every 1000 people.']
     },
     {
         id: 'sfa-5', kind: 'compare', bubbleTravel: STANDARD_BUBBLE_TRAVEL,
