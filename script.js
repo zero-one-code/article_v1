@@ -2978,7 +2978,7 @@ function createEffectivenessRangePinLayer() {
     content.appendChild(compareMeanDifferenceCard);
 
     const compareOverallCard = makeEffectivenessRangePinnedCard(
-        '<span class=\"grey\">Overall, this study shows that</span> the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
+        '<span class=\"grey\">This indicates</span> the herpes<br>zoster vaccine appears to prevent the risk<br>of developing it.',
         'effectiveness-range-pinned-card--compare-overall'
     );
     setBox(compareOverallCard, 464, 0, 993, 301);
@@ -3833,7 +3833,7 @@ const SAFETY_SCENE_DEFS = [
         bubbleSpacing: 1900,
         bubbleTravel: 2300,
         bubbles: [
-            '<span class="grey">This study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while there was</span> no clear evidence of a difference in serious adverse events between groups.'
+            '<span class="grey">Overall, this study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while there are likely</span> no clear evidence of a difference in serious adverse events between groups.'
         ]
     },
     {
