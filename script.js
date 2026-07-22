@@ -3510,7 +3510,7 @@ function renderSafety() {
     });
     addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 35984);
     addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 36345);
-    addCard("safety", "This indicates no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.", 36706);
+    addCard("safety", "This indicates no clear difference between the vaccinated and placebo groups in<br>serious adverse events.", 36706);
 }
 
 function renderClosing() {
@@ -3819,7 +3819,7 @@ const SAFETY_SCENE_DEFS = [
         bubbles: [
             'So for every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event <span class="grey">compared to the placebo group.</span>',
             'The likely ranges overlapped<span class="grey"> and were close to each other,</span> at <span class="purple">20</span> to <span class="purple">24</span> cases in the placebo group and <span class="purple">21</span> to <span class="purple">26</span> cases in the vaccinated group.',
-            '<span class="grey">This indicates</span> no clear difference<br>between the vaccinated and placebo groups in<br>serious adverse events.'
+            '<span class="grey">This indicates</span> no clear difference between the vaccinated and placebo groups in serious adverse events.'
         ]
     },
     {
