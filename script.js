@@ -3822,7 +3822,7 @@ function handleDecisionIntroWheel(event) {
 
 function renderIntro() {
     const mainTitle = makeElement("h1", "title main-title landing-static-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
-    appendElement("intro", mainTitle, 455, 349, 1010);
+    appendElement("intro", mainTitle, 455, 369, 1010);
 
     addScrollButton("intro");
 
