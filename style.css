@@ -57,12 +57,12 @@ body {
     width: 1920px;
 }
 
-#section-intro { top: 0; height: 7150px; }
-#section-effectiveness { top: 7150px; height: 5150px; }
-#section-uncertainty { top: 12300px; height: 7150px; }
-#section-effectiveness-range { top: 19450px; height: 5050px; }
-#section-safety { top: 24500px; height: 12800px; }
-#section-closing { top: 37300px; height: 2700px; }
+#section-intro { top: 0; height: 10570px; }
+#section-effectiveness { top: 10570px; height: 5150px; }
+#section-uncertainty { top: 15720px; height: 7150px; }
+#section-effectiveness-range { top: 22870px; height: 7250px; }
+#section-safety { top: 30120px; height: 12800px; }
+#section-closing { top: 42920px; height: 2700px; }
 
 .positioned,
 .title,
@@ -1077,9 +1077,24 @@ body {
 
 .effectiveness-question-block {
     position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    text-align: center;
     opacity: 1;
     will-change: opacity, transform;
     backface-visibility: hidden;
+}
+
+.effectiveness-question-block .title,
+.effectiveness-question-block .subtitle {
+    position: static;
+    left: auto;
+    top: auto;
+    width: 100%;
+    margin: 0;
 }
 
 .effectiveness-question-title {
@@ -1469,7 +1484,7 @@ body {
     visibility: hidden;
     opacity: 0;
     z-index: 12;
-    background: #ffffff;
+    background: transparent;
     isolation: isolate;
     contain: layout paint style;
     backface-visibility: hidden;
@@ -5037,4 +5052,65 @@ button {
     font-size: var(--hero-title-font-size, 77px) !important;
     line-height: 1.16 !important;
     letter-spacing: -1px !important;
+}
+
+#scrollButton.scroll-button {
+    z-index: 20 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto;
+}
+
+.landing-static-title,
+#scrollButton {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.story-top-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    z-index: 1000;
+    overflow: hidden;
+    pointer-events: none;
+    background: #cfcfcf;
+    transform: translateZ(0);
+}
+.story-top-progress-fill {
+    width: 100%;
+    height: 100%;
+    background: var(--blue);
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
+}
+.mobile-hero-layer { z-index: 13; }
+.mobile-hero-content { will-change: opacity, transform, filter; }
+@media (max-width: 767px) { .story-top-progress { height: 4.5px; } }
+
+.mobile-scroll-hint {
+    pointer-events: auto;
+    cursor: pointer;
+}
+.mobile-scroll-hint:focus-visible {
+    outline: 3px solid rgba(0, 115, 195, 0.35);
+    outline-offset: 8px;
+    border-radius: 8px;
+}
+@media (min-width: 768px) {
+    .mobile-scroll-hint {
+        bottom: 54px;
+        width: 420px;
+    }
+    .mobile-scroll-hint .scroll-guide,
+    .mobile-scroll-hint .scroll-label {
+        font-size: 16px;
+    }
+    .mobile-scroll-hint .scroll-arrow {
+        font-size: 40px;
+    }
 }
