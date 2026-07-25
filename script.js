@@ -3659,19 +3659,51 @@ function updateMobileHeroLayer(currentDesignY) {
 }
 
 let controlledScrollAnimationId = null;
+let controlledScrollRunId = 0;
+let isControlledScrolling = false;
 
-function animateWindowToDesignY(targetDesignY, duration) {
+function animateWindowToDesignY(targetDesignY, duration, onComplete) {
     if (controlledScrollAnimationId !== null) {
         window.cancelAnimationFrame(controlledScrollAnimationId);
         controlledScrollAnimationId = null;
     }
 
+    const runId = ++controlledScrollRunId;
     const targetTop = designYToScrollTop(targetDesignY);
-    if (prefersReducedMotion || !(duration > 0)) {
-        window.scrollTo({ top: targetTop, behavior: "auto" });
+    isControlledScrolling = true;
+
+    const commitTarget = () => {
+        if (runId !== controlledScrollRunId) {
+            return;
+        }
+
+        window.scrollTo(0, targetTop);
         scrollState.targetDesignY = targetDesignY;
         scrollState.currentDesignY = targetDesignY;
         updateScrollDrivenScenes(targetDesignY);
+    };
+
+    const finish = () => {
+        commitTarget();
+
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                if (runId !== controlledScrollRunId) {
+                    return;
+                }
+
+                commitTarget();
+                isControlledScrolling = false;
+
+                if (typeof onComplete === "function") {
+                    onComplete();
+                }
+            });
+        });
+    };
+
+    if (prefersReducedMotion || !(duration > 0)) {
+        finish();
         return;
     }
 
@@ -3680,6 +3712,10 @@ function animateWindowToDesignY(targetDesignY, duration) {
     const startTime = performance.now();
 
     const frame = (now) => {
+        if (runId !== controlledScrollRunId) {
+            return;
+        }
+
         const progress = clamp((now - startTime) / duration, 0, 1);
         const eased = progress < 0.5
             ? 4 * progress * progress * progress
@@ -3687,20 +3723,18 @@ function animateWindowToDesignY(targetDesignY, duration) {
         const nextTop = startTop + (distance * eased);
         const nextDesignY = nextTop / (getScale() * TIMELINE_SCALE);
 
-        window.scrollTo({ top: nextTop, behavior: "auto" });
+        window.scrollTo(0, nextTop);
         scrollState.targetDesignY = nextDesignY;
         scrollState.currentDesignY = nextDesignY;
         updateScrollDrivenScenes(nextDesignY);
 
         if (progress < 1) {
             controlledScrollAnimationId = window.requestAnimationFrame(frame);
-        } else {
-            controlledScrollAnimationId = null;
-            window.scrollTo({ top: targetTop, behavior: "auto" });
-            scrollState.targetDesignY = targetDesignY;
-            scrollState.currentDesignY = targetDesignY;
-            updateScrollDrivenScenes(targetDesignY);
+            return;
         }
+
+        controlledScrollAnimationId = null;
+        finish();
     };
 
     controlledScrollAnimationId = window.requestAnimationFrame(frame);
@@ -3718,12 +3752,31 @@ function scrollToBurden() {
 let landingFirstScrollHandled = false;
 let landingScrollSnapInProgress = false;
 let landingTouchStartY = null;
+let landingSnapReleaseTimer = null;
 
 function isWithinLandingAdvanceRange() {
     const targetDesignY = getDiseaseNavigationTop();
     const currentDesignY = readDesignScrollY();
     const landingLimit = Math.min(560, targetDesignY * 0.48);
     return currentDesignY <= landingLimit;
+}
+
+function lockLandingAtTarget(targetDesignY) {
+    const targetTop = designYToScrollTop(targetDesignY);
+    window.scrollTo({ top: targetTop, behavior: "auto" });
+    scrollState.targetDesignY = targetDesignY;
+    scrollState.currentDesignY = targetDesignY;
+    updateScrollDrivenScenes(targetDesignY);
+}
+
+function releaseLandingSnap(targetDesignY) {
+    lockLandingAtTarget(targetDesignY);
+
+    window.clearTimeout(landingSnapReleaseTimer);
+    landingSnapReleaseTimer = window.setTimeout(() => {
+        lockLandingAtTarget(targetDesignY);
+        landingScrollSnapInProgress = false;
+    }, 420);
 }
 
 function triggerLandingAdvance(event) {
@@ -3742,18 +3795,28 @@ function triggerLandingAdvance(event) {
         event.preventDefault();
     }
 
+    const targetDesignY = getDiseaseNavigationTop();
+    const animationDuration = prefersReducedMotion ? 0 : 1320;
+
     landingFirstScrollHandled = true;
     landingScrollSnapInProgress = true;
-    scrollToBurden();
+    window.clearTimeout(landingSnapReleaseTimer);
 
-    window.setTimeout(() => {
-        landingScrollSnapInProgress = false;
-    }, prefersReducedMotion ? 80 : 1380);
+    animateWindowToDesignY(targetDesignY, animationDuration, () => {
+        releaseLandingSnap(targetDesignY);
+    });
 
     return true;
 }
 
 function handleLandingFirstWheel(event) {
+    if (landingScrollSnapInProgress) {
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+        return;
+    }
+
     if (event.deltaY <= 0) {
         return;
     }
@@ -3762,6 +3825,11 @@ function handleLandingFirstWheel(event) {
 }
 
 function handleLandingTouchStart(event) {
+    if (landingScrollSnapInProgress) {
+        landingTouchStartY = null;
+        return;
+    }
+
     if (!event.touches || event.touches.length !== 1) {
         landingTouchStartY = null;
         return;
@@ -3771,6 +3839,13 @@ function handleLandingTouchStart(event) {
 }
 
 function handleLandingTouchMove(event) {
+    if (landingScrollSnapInProgress) {
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+        return;
+    }
+
     if (landingTouchStartY === null || !event.touches || event.touches.length !== 1) {
         return;
     }
@@ -3791,11 +3866,24 @@ function handleLandingTouchEnd() {
 function handleLandingFirstKeydown(event) {
     const advanceKeys = ["ArrowDown", "PageDown", " "];
 
+    if (landingScrollSnapInProgress) {
+        if (advanceKeys.includes(event.key)) {
+            event.preventDefault();
+        }
+        return;
+    }
+
     if (!advanceKeys.includes(event.key)) {
         return;
     }
 
     triggerLandingAdvance(event);
+}
+
+function resetLandingAdvanceWhenBackAtTop() {
+    if (!landingScrollSnapInProgress && readDesignScrollY() < 40) {
+        landingFirstScrollHandled = false;
+    }
 }
 
 let decisionWheelGestureCount = 0;
@@ -4218,6 +4306,11 @@ function buildScrollamaSteps() {
 }
 
 function renderFromScrollama() {
+
+    if (isControlledScrolling || landingScrollSnapInProgress) {
+        return;
+    }
+
     const designY = readDesignScrollY();
     scrollState.targetDesignY = designY;
     scrollState.currentDesignY = designY;
@@ -5103,5 +5196,6 @@ window.addEventListener("load", function () {
     window.addEventListener("touchmove", handleLandingTouchMove, { passive: false });
     window.addEventListener("touchend", handleLandingTouchEnd, { passive: true });
     window.addEventListener("keydown", handleLandingFirstKeydown);
+    window.addEventListener("scroll", resetLandingAdvanceWhenBackAtTop, { passive: true });
     window.addEventListener("wheel", handleDecisionIntroWheel, { passive: false });
 });
