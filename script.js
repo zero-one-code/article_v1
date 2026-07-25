@@ -1,16 +1,23 @@
 const designWidth = 1920;
 const designHeight = 72000;
+
+const MOBILE_LAYOUT_QUERY = "(max-width: 900px), (pointer: coarse) and (max-width: 1180px)";
+const DESKTOP_TIMELINE_SCALE = 1.12;
+const MOBILE_TIMELINE_SCALE = 1.60;
+const TIMELINE_SCALE = window.matchMedia(MOBILE_LAYOUT_QUERY).matches
+    ? MOBILE_TIMELINE_SCALE
+    : DESKTOP_TIMELINE_SCALE;
 const dotSpacing = 20.95;
 const dotSpacingY = 20.88;
 const dotSize = 12;
 
 const sectionTops = {
     intro: 0,
-    effectiveness: 7150,
-    uncertainty: 12300,
-    effectivenessRange: 19450,
-    safety: 24500,
-    closing: 37300
+    effectiveness: 10570,
+    uncertainty: 15720,
+    effectivenessRange: 22870,
+    safety: 30120,
+    closing: 42920
 };
 
 const sections = {
@@ -70,7 +77,7 @@ function getSceneNavigationTop(selector, visibleOffset) {
 }
 
 function getDiseaseNavigationTop() {
-    const visibleOffset = isMobileLayout() ? 80 : 0;
+    const visibleOffset = 40;
     return getSceneNavigationTop(".disease-scrolly", visibleOffset);
 }
 
@@ -82,14 +89,12 @@ function getSafetyNavigationTop() {
 
     const sceneTop = parseFloat(scene.dataset.absoluteTop || '0');
     const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
-    const pinDuration = parseFloat(scene.dataset.pinDuration || '8600');
     const buildDuration = 5000;
-    const outroDuration = Math.max(1, pinDuration - buildDuration);
-    const safetyIntroTargetProgress = 0.755;
+    const safetyTitleOnlyOutroDistance = 4790;
 
     return Math.max(
         0,
-        sceneTop - pinOffset + buildDuration + (outroDuration * safetyIntroTargetProgress)
+        sceneTop - pinOffset + buildDuration + safetyTitleOnlyOutroDistance
     );
 }
 
@@ -117,7 +122,7 @@ const MOBILE_SOURCE_TEXT_FONT_SIZE = 12;
 const MOBILE_SOURCE_TITLE_FONT_SIZE = 13;
 
 function isMobileLayout() {
-    return window.matchMedia("(max-width: 900px), (pointer: coarse) and (max-width: 1180px)").matches;
+    return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
 }
 
 const scrollState = {
@@ -128,7 +133,11 @@ const scrollState = {
 };
 
 function readDesignScrollY() {
-    return window.scrollY / getScale();
+    return window.scrollY / (getScale() * TIMELINE_SCALE);
+}
+
+function designYToScrollTop(designY) {
+    return designY * getScale() * TIMELINE_SCALE;
 }
 
 function syncScrollStateToWindow(force) {
@@ -169,6 +178,7 @@ function setSceneHandoffVeil(opacity) {
 }
 
 function updateScrollDrivenScenes(currentDesignY) {
+    updateTopProgressBar();
     updateProgressRail();
     updateMobileHeroLayer(currentDesignY);
     updateDiseaseScrolly(currentDesignY);
@@ -179,6 +189,7 @@ function updateScrollDrivenScenes(currentDesignY) {
     updateUncertaintyConceptScrolly(currentDesignY);
     updateEffectivenessRangeScrolly(currentDesignY);
     updatePinnedPages(currentDesignY);
+    enforceSingleMobileSpeechCard();
 }
 
 function requestScrollSceneFrame() {
@@ -255,18 +266,18 @@ function getMobileBackgroundScale() {
 function getMatchedPinTop(pinOffset, staticY, pinnedY) {
     const stageScale = getScale();
     const pinScale = getPinScale();
-    return (pinOffset * stageScale) + (staticY * stageScale) - (pinnedY * pinScale);
+    return (pinOffset * stageScale * TIMELINE_SCALE) + (staticY * stageScale) - (pinnedY * pinScale);
 }
 
 function getMatchedPinTopForScale(pinOffset, staticY, pinnedY, targetScale) {
     const stageScale = getScale();
-    return (pinOffset * stageScale) + (staticY * stageScale) - (pinnedY * targetScale);
+    return (pinOffset * stageScale * TIMELINE_SCALE) + (staticY * stageScale) - (pinnedY * targetScale);
 }
 
 function getMatchedStaticPinTop(pinOffset, staticY, pinnedY) {
     const stageScale = getScale();
     const pinScale = getPinScale();
-    return (pinOffset * stageScale) + (staticY * pinScale) - (pinnedY * pinScale);
+    return (pinOffset * stageScale * TIMELINE_SCALE) + (staticY * pinScale) - (pinnedY * pinScale);
 }
 
 function addReveal(element, variant) {
@@ -599,7 +610,7 @@ function addScrollButton(sectionName) {
     button.type = "button";
     button.id = "scrollButton";
     button.setAttribute("aria-label", "Scroll to the disease burden section");
-    return appendElement(sectionName, button, 750, 866, 420);
+    return appendElement(sectionName, button, 750, 856, 420);
 }
 
 function addIntroPlots() {
@@ -928,18 +939,22 @@ function smoothStep(edge0, edge1, value) {
     return progress * progress * (3 - (2 * progress));
 }
 
+const SPEECH_SCROLL_DISTANCE = 1595;
+
 const MOTION = {
-    speechStartY: 940,
-    speechEndY: -430,
+    speechStartY: 1080,
+    speechEndY: -520,
     speechFadeInStart: 0.025,
-    speechFadeInEnd: 0.135,
-    speechFadeOutStart: 0.855,
+    speechFadeInEnd: 0.13,
+    speechFadeOutStart: 0.885,
     speechFadeOutEnd: 0.985,
-    mobileSpeechStartY: 1140,
-    mobileSpeechEndY: -1200,
+    mobileSpeechStartY: 1180,
+    mobileSpeechEndY: -980,
+    mobileSpeechEntryViewportPadding: 28,
+    mobileSpeechExitViewportPadding: 24,
     mobileSpeechFadeInStart: 0.025,
-    mobileSpeechFadeInEnd: 0.135,
-    mobileSpeechFadeOutStart: 0.855,
+    mobileSpeechFadeInEnd: 0.15,
+    mobileSpeechFadeOutStart: 0.865,
     mobileSpeechFadeOutEnd: 0.985,
     scrollCatchupLarge: 0.72,
     scrollCatchupMedium: 0.52,
@@ -949,28 +964,148 @@ const MOTION = {
 
 function easeScrollMotion(value) {
     const t = clamp(value, 0, 1);
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return t * t * (3 - (2 * t));
 }
 
-function setHybridSpeechCardMotion(card, progress, startY, endY, fadeOutStart) {
+function getSpeechTravelProgress(progress) {
+    const t = clamp(progress, 0, 1);
+
+    if (t <= 0.07) {
+        return lerp(0, 0.13, smoothStep(0, 0.07, t));
+    }
+
+    if (t <= 0.93) {
+        return lerp(0.13, 0.87, smoothStep(0.07, 0.93, t));
+    }
+
+    return lerp(0.87, 1, smoothStep(0.93, 1, t));
+}
+
+function getSpeechProgress(scrollDistance, startDistance) {
+    return clamp((scrollDistance - startDistance) / SPEECH_SCROLL_DISTANCE, 0, 1);
+}
+
+function getMobileSequenceProgress(scrollDistance, index, count, sequenceEnd, options) {
+    const settings = options || {};
+    const startPadding = Number.isFinite(settings.startPadding) ? settings.startPadding : 0;
+    const gap = Number.isFinite(settings.gap) ? settings.gap : 90;
+    const safeCount = Math.max(1, count || 1);
+    const usableDistance = Math.max(
+        safeCount,
+        sequenceEnd - startPadding - (gap * Math.max(0, safeCount - 1))
+    );
+    const cardDistance = usableDistance / safeCount;
+    const startDistance = startPadding + (index * (cardDistance + gap));
+
+    return clamp((scrollDistance - startDistance) / cardDistance, 0, 1);
+}
+
+function getMobileSpeechGeometry(card) {
+    if (card === null) return null;
+
+    const offsetParent = card.offsetParent || card.parentElement;
+    if (offsetParent === null) return null;
+
+    const parentRect = offsetParent.getBoundingClientRect();
+    const parentScale = Math.max(0.01, getCumulativeTransformScale(offsetParent));
+    const cardBaseTop = parentRect.top + ((card.offsetTop || 0) * parentScale);
+    const cardHeight = Math.max(1, (card.offsetHeight || 1) * parentScale);
+
+    return { parentScale, cardBaseTop, cardHeight };
+}
+
+function resolveMobileSpeechStartY(card) {
+    const geometry = getMobileSpeechGeometry(card);
+    if (geometry === null) return MOTION.mobileSpeechStartY;
+
+    const targetTop = window.innerHeight + MOTION.mobileSpeechEntryViewportPadding;
+    const resolved = (targetTop - geometry.cardBaseTop) / geometry.parentScale;
+    return Number.isFinite(resolved) ? resolved : MOTION.mobileSpeechStartY;
+}
+
+function resolveMobileSpeechEndY(card) {
+    const geometry = getMobileSpeechGeometry(card);
+    if (geometry === null) return MOTION.mobileSpeechEndY;
+
+    const targetTop = -(geometry.cardHeight + MOTION.mobileSpeechExitViewportPadding);
+    const resolved = (targetTop - geometry.cardBaseTop) / geometry.parentScale;
+    return Number.isFinite(resolved) ? resolved : MOTION.mobileSpeechEndY;
+}
+
+
+function setHybridSpeechCardMotion(card, progress) {
+    if (card === null) return;
+
     const safeProgress = clamp(progress, 0, 1);
     const mobile = isMobileLayout();
-
-    const resolvedStartY = mobile ? MOTION.mobileSpeechStartY : startY;
-    const resolvedEndY = mobile ? MOTION.mobileSpeechEndY : endY;
+    const geometry = getMobileSpeechGeometry(card);
+    const resolvedStartY = resolveMobileSpeechStartY(card);
+    const resolvedEndY = resolveMobileSpeechEndY(card);
     const fadeInStart = mobile ? MOTION.mobileSpeechFadeInStart : MOTION.speechFadeInStart;
     const fadeInEnd = mobile ? MOTION.mobileSpeechFadeInEnd : MOTION.speechFadeInEnd;
-    const resolvedFadeOutStart = mobile ? MOTION.mobileSpeechFadeOutStart : fadeOutStart;
-    const fadeOutEnd = mobile ? MOTION.mobileSpeechFadeOutEnd : MOTION.speechFadeOutEnd;
-
-    const eased = smoothStep(0, 1, safeProgress);
-    const y = lerp(resolvedStartY, resolvedEndY, eased);
+    const travel = getSpeechTravelProgress(safeProgress);
+    const y = lerp(resolvedStartY, resolvedEndY, travel);
     const fadeIn = smoothStep(fadeInStart, fadeInEnd, safeProgress);
-    const fadeOut = 1 - smoothStep(resolvedFadeOutStart, fadeOutEnd, safeProgress);
-    const opacity = Math.min(fadeIn, fadeOut);
+    let fadeOut = 1;
+    if (geometry !== null) {
+        const progressBar = document.querySelector(".story-top-progress");
+        const progressBarHeight = progressBar === null
+            ? 0
+            : Math.max(0, progressBar.getBoundingClientRect().height || 0);
+        const actualTop = geometry.cardBaseTop + (y * geometry.parentScale);
+        const actualBottom = actualTop + geometry.cardHeight;
+        fadeOut = smoothStep(
+            progressBarHeight - 12,
+            progressBarHeight + 24,
+            actualBottom
+        );
+    } else {
+        const fadeOutStart = mobile ? 0.965 : 0.965;
+        const fadeOutEnd = mobile ? 0.999 : 0.999;
+        fadeOut = 1 - smoothStep(fadeOutStart, fadeOutEnd, safeProgress);
+    }
+
+    const hasExited = safeProgress >= 0.9999;
+    const opacity = hasExited ? 0 : (fadeIn * fadeOut);
 
     card.style.opacity = opacity.toFixed(3);
+    card.style.visibility = opacity > 0.01 ? "visible" : "hidden";
     card.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+}
+
+function enforceSingleMobileSpeechCard() {
+    if (!isMobileLayout()) {
+        return;
+    }
+
+    const candidates = Array.from(document.querySelectorAll('.text-card'))
+        .filter((card) => !card.classList.contains('uncertainty-concept-card'))
+        .map((card) => {
+            const opacity = parseFloat(card.style.opacity || '0');
+            const rect = card.getBoundingClientRect();
+            const onscreen = rect.bottom > -40 && rect.top < (window.innerHeight + 40);
+            return { card, opacity: Number.isFinite(opacity) ? opacity : 0, rect, onscreen };
+        })
+        .filter((item) => item.opacity > 0.01 && item.onscreen);
+
+    if (candidates.length <= 1) {
+        return;
+    }
+
+    candidates.sort((a, b) => {
+        if (Math.abs(b.opacity - a.opacity) > 0.015) {
+            return b.opacity - a.opacity;
+        }
+        const viewportCenter = window.innerHeight / 2;
+        const aCenter = (a.rect.top + a.rect.bottom) / 2;
+        const bCenter = (b.rect.top + b.rect.bottom) / 2;
+        return Math.abs(aCenter - viewportCenter) - Math.abs(bCenter - viewportCenter);
+    });
+
+    candidates.slice(1).forEach(({ card }) => {
+        card.style.opacity = '0';
+        card.style.visibility = 'hidden';
+    });
 }
 
 function makeDiseaseCard(html, className) {
@@ -1027,10 +1162,10 @@ function createDiseasePinLayer() {
 }
 
 function addDiseaseScrollScene(sectionName, absoluteTop) {
-    const sceneHeight = 2800;
+    const sceneHeight = 3445;
     const pinOffset = 150;
-    const pinDuration = 2500;
-    const transitionOutStart = 0.84;
+    const pinDuration = 3145;
+    const transitionOutStart = (1250 + SPEECH_SCROLL_DISTANCE) / pinDuration;
     const scene = makeElement("div", "disease-scrolly");
     scene.dataset.absoluteTop = String(absoluteTop);
     scene.dataset.sceneHeight = String(sceneHeight);
@@ -1044,10 +1179,6 @@ function addDiseaseScrollScene(sectionName, absoluteTop) {
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
     createDiseasePinLayer();
     return scene;
-}
-
-function setDiseaseCardScrollPosition(card, progress) {
-    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -470);
 }
 
 function updateDiseaseScrolly(currentDesignY) {
@@ -1066,12 +1197,15 @@ function updateDiseaseScrolly(currentDesignY) {
     currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
     const pinStart = sceneTop - pinOffset;
     const pinEnd = pinStart + pinDuration;
+    const landingHandoffStart = pinStart - 420;
+    const landingHandoffEnd = pinStart + 40;
     const overallProgress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
-    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
-    const transitionProgress = smoothStep(transitionOutStart, 0.93, overallProgress);
-    const contentOpacity = isPinned ? (1 - transitionProgress) : 0;
+    const isPinned = getScenePinnedState(currentDesignY, landingHandoffStart, pinEnd);
+    const landingHandoff = smoothStep(landingHandoffStart, landingHandoffEnd, currentDesignY);
+    const transitionProgress = smoothStep(transitionOutStart, 1.0, overallProgress);
+    const contentOpacity = isPinned ? (landingHandoff * (1 - transitionProgress)) : 0;
     const sceneBottom = sceneTop + parseFloat(scene.dataset.sceneHeight || "0");
-    const shouldKeepStaticHidden = currentDesignY >= pinStart && currentDesignY < sceneBottom;
+    const shouldKeepStaticHidden = currentDesignY >= landingHandoffStart;
     const staticLayer = scene.querySelector(".disease-static-layer");
     const content = pinLayer.querySelector(".disease-pin-content");
     const diseaseTitle = pinLayer.querySelector(".disease-title");
@@ -1084,9 +1218,10 @@ function updateDiseaseScrolly(currentDesignY) {
 
     if (content !== null) {
         const diseaseBlur = lerp(0, 1.15, transitionProgress);
+        const landingEnterY = Math.round(lerp(12, 0, landingHandoff));
         if (isMobileLayout()) {
             content.style.top = `${Math.round(getPinOffsetY())}px`;
-            content.style.transform = "translate3d(-50%, 0, 0) scale(var(--pin-scale))";
+            content.style.transform = `translate3d(-50%, ${landingEnterY}px, 0) scale(var(--pin-scale))`;
         } else {
             content.style.top =
                 `${Math.round(
@@ -1098,16 +1233,18 @@ function updateDiseaseScrolly(currentDesignY) {
                 )}px`;
 
             content.style.transform =
-                "translate3d(-50%, 0, 0) scale(var(--pin-scale))";
+                `translate3d(-50%, ${landingEnterY}px, 0) scale(var(--pin-scale))`;
         }
         content.style.opacity = contentOpacity.toFixed(3);
         content.style.filter = "none";
 
         if (diseaseTitle !== null) {
-            diseaseTitle.style.filter = `blur(${diseaseBlur.toFixed(2)}px)`;
+            const entryBlur = lerp(1.8, 0, landingHandoff);
+            diseaseTitle.style.filter = `blur(${Math.max(diseaseBlur, entryBlur).toFixed(2)}px)`;
         }
         if (diseaseImage !== null) {
-            diseaseImage.style.filter = `blur(${diseaseBlur.toFixed(2)}px)`;
+            const entryBlur = lerp(1.8, 0, landingHandoff);
+            diseaseImage.style.filter = `blur(${Math.max(diseaseBlur, entryBlur).toFixed(2)}px)`;
             diseaseImage.style.transform = `scale(${getMobileBackgroundScale().toFixed(4)})`;
             diseaseImage.style.transformOrigin = "center center";
         }
@@ -1118,12 +1255,36 @@ function updateDiseaseScrolly(currentDesignY) {
         staticLayer.style.opacity = shouldKeepStaticHidden ? "0" : "1";
     }
 
-    if (firstCard !== null) {
-    setDiseaseCardScrollPosition(firstCard, clamp((overallProgress - 0.02) / 0.42, 0, 1));
-    }
+    const scrollDist = currentDesignY - pinStart;
 
+    const diseaseSequenceEnd = pinDuration * transitionOutStart;
+    const diseaseSequenceConfig = isMobileLayout()
+        ? { startPadding: 180, gap: 160 }
+        : { startPadding: 0, gap: 160 };
+
+    if (firstCard !== null) {
+        setHybridSpeechCardMotion(
+            firstCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                0,
+                2,
+                diseaseSequenceEnd,
+                diseaseSequenceConfig
+            )
+        );
+    }
     if (secondCard !== null) {
-        setDiseaseCardScrollPosition(secondCard, clamp((overallProgress - 0.54) / 0.42, 0, 1));
+        setHybridSpeechCardMotion(
+            secondCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                1,
+                2,
+                diseaseSequenceEnd,
+                diseaseSequenceConfig
+            )
+        );
     }
 }
 
@@ -1182,10 +1343,10 @@ function createRiskPinLayer() {
 }
 
 function addRiskScrollScene(sectionName, absoluteTop) {
-    const sceneHeight = 2300;
+    const sceneHeight = 3595;
     const pinOffset = 120;
-    const pinDuration = 2180;
-    const transitionOutStart = 0.94;
+    const pinDuration = 3445;
+    const transitionOutStart = (1450 + SPEECH_SCROLL_DISTANCE) / pinDuration;
     const scene = makeElement("div", "risk-scrolly");
     scene.dataset.absoluteTop = String(absoluteTop);
     scene.dataset.sceneHeight = String(sceneHeight);
@@ -1199,10 +1360,6 @@ function addRiskScrollScene(sectionName, absoluteTop) {
     appendElement(sectionName, scene, 0, absoluteTop, 1920, sceneHeight);
     createRiskPinLayer();
     return scene;
-}
-
-function setRiskCardScrollPosition(card, progress) {
-    setVaccineCardScrollPosition(card, progress, MOTION.speechStartY, -470);
 }
 
 function updateRiskScrolly(currentDesignY) {
@@ -1224,7 +1381,7 @@ function updateRiskScrolly(currentDesignY) {
     const overallProgress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
     const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
     const sceneBottom = sceneTop + parseFloat(scene.dataset.sceneHeight || "0");
-    const shouldKeepStaticHidden = currentDesignY >= pinStart && currentDesignY < sceneBottom;
+    const shouldKeepStaticHidden = currentDesignY >= pinStart;
     const diseaseScene = document.querySelector(".disease-scrolly");
     let riskHandoffOpacity = 1;
 
@@ -1233,17 +1390,12 @@ function updateRiskScrolly(currentDesignY) {
         const diseasePinOffset = parseFloat(diseaseScene.dataset.pinOffset || "0");
         const diseasePinDuration = parseFloat(diseaseScene.dataset.pinDuration || "1");
         const diseasePinStart = diseaseTop - diseasePinOffset;
-        const riskHandoffStartY = diseasePinStart + (diseasePinDuration * 0.86);
-        const riskHandoffEndY = diseasePinStart + (diseasePinDuration * 0.985);
-        const veilInY = diseasePinStart + (diseasePinDuration * 0.84);
-        const veilPeakY = diseasePinStart + (diseasePinDuration * 0.91);
-        const veilOutY = diseasePinStart + (diseasePinDuration * 0.99);
-        const veilIn = smoothStep(veilInY, veilPeakY, currentDesignY);
-        const veilOut = 1 - smoothStep(veilPeakY, veilOutY, currentDesignY);
-        const veilOpacity = Math.min(veilIn, veilOut) * 0.72;
+        const diseaseTransitionStart = parseFloat(diseaseScene.dataset.transitionOutStart || "0.94");
+        const riskHandoffStartY = diseasePinStart + (diseasePinDuration * diseaseTransitionStart);
+        const riskHandoffEndY = diseasePinStart + diseasePinDuration;
 
         riskHandoffOpacity = smoothStep(riskHandoffStartY, riskHandoffEndY, currentDesignY);
-        setSceneHandoffVeil(veilOpacity);
+        setSceneHandoffVeil(0);
     }
 
     if (diseaseScene === null) {
@@ -1261,21 +1413,17 @@ function updateRiskScrolly(currentDesignY) {
     pinLayer.classList.toggle("is-active", isPinned);
     pinLayer.style.opacity = isPinned ? "1" : "0";
 
-    const firstCardStart = 0.34;
-    const firstCardEnd = 0.60;
-    const secondCardStart = 0.62;
-    const secondCardEnd = 0.88;
-    const sceneExitStart = 0.89;
-    const sceneExitEnd = 0.98;
+    const sceneExitStart = transitionOutStart;
+    const sceneExitEnd = 1.0;
 
     if (content !== null) {
         const exitLift = smoothStep(sceneExitStart, sceneExitEnd, overallProgress);
-        const exitY = Math.round(lerp(0, -30, exitLift));
-        const enterY = Math.round(lerp(16, 0, riskHandoffOpacity));
-        const riskFadeIn = smoothStep(0.00, 0.20, overallProgress);
+        const exitY = Math.round(lerp(0, -24, exitLift));
+        const enterY = Math.round(lerp(10, 0, riskHandoffOpacity));
+        const riskFadeIn = smoothStep(0.00, 0.16, overallProgress);
         const riskFadeOut = 1 - smoothStep(sceneExitStart, sceneExitEnd, overallProgress);
         const riskOpacity = contentOpacity * riskFadeIn * riskFadeOut;
-        const incomingBlur = lerp(5.5, 0, Math.min(riskHandoffOpacity, riskFadeIn));
+        const incomingBlur = lerp(3.2, 0, Math.min(riskHandoffOpacity, riskFadeIn));
         content.style.top = isMobileLayout()
             ? `${Math.round(getPinOffsetY())}px`
             : `${Math.round(getMatchedStaticPinTop(pinOffset, 72, 72))}px`;
@@ -1297,14 +1445,36 @@ function updateRiskScrolly(currentDesignY) {
         staticLayer.style.opacity = shouldKeepStaticHidden ? "0" : riskHandoffOpacity.toFixed(3);
     }
 
-    if (firstCard !== null) {
-        const firstCardProgress = clamp((overallProgress - firstCardStart) / (firstCardEnd - firstCardStart), 0, 1);
-        setRiskCardScrollPosition(firstCard, firstCardProgress);
-    }
+    const scrollDist = currentDesignY - pinStart;
 
+    const riskSequenceEnd = pinDuration * sceneExitStart;
+    const riskSequenceConfig = isMobileLayout()
+        ? { startPadding: 180, gap: 160 }
+        : { startPadding: 40, gap: 160 };
+
+    if (firstCard !== null) {
+        setHybridSpeechCardMotion(
+            firstCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                0,
+                2,
+                riskSequenceEnd,
+                riskSequenceConfig
+            )
+        );
+    }
     if (secondCard !== null) {
-        const secondCardProgress = clamp((overallProgress - secondCardStart) / (secondCardEnd - secondCardStart), 0, 1);
-        setRiskCardScrollPosition(secondCard, secondCardProgress);
+        setHybridSpeechCardMotion(
+            secondCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                1,
+                2,
+                riskSequenceEnd,
+                riskSequenceConfig
+            )
+        );
     }
 }
 
@@ -1411,9 +1581,9 @@ function createVaccinePinLayer() {
 }
 
 function addVaccinationScrollScene(sectionName, absoluteTop) {
-    const sceneHeight = 1950;
+    const sceneHeight = 4545;
     const pinOffset = 0;
-    const pinDuration = 1950;
+    const pinDuration = 4545;
     const scene = makeElement("div", "vaccine-scrolly");
     scene.dataset.absoluteTop = String(absoluteTop);
     scene.dataset.sceneHeight = String(sceneHeight);
@@ -1425,12 +1595,12 @@ function addVaccinationScrollScene(sectionName, absoluteTop) {
     return scene;
 }
 
-function setVaccineCardScrollPosition(card, progress, startY, endY) {
-    setHybridSpeechCardMotion(card, progress, startY, endY, 0.84);
+function setVaccineCardScrollPosition(card, progress) {
+    setHybridSpeechCardMotion(card, progress);
 }
 
-function setOpaqueSpeechCardScrollPosition(card, progress, startY, endY) {
-    setHybridSpeechCardMotion(card, progress, startY, endY, 0.925);
+function setOpaqueSpeechCardScrollPosition(card, progress) {
+    setHybridSpeechCardMotion(card, progress);
     card.style.background = '#ffffff';
 }
 
@@ -1449,7 +1619,28 @@ function updateVaccinationScrolly(currentDesignY) {
     const pinStart = sceneTop - pinOffset;
     const pinEnd = pinStart + pinDuration;
     const overallProgress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
-    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
+
+    const riskScene = document.querySelector(".risk-scrolly");
+    let handoffStart = pinStart - 260;
+    let handoffEnd = pinStart + 120;
+    let activeStart = handoffStart;
+
+    if (riskScene !== null) {
+        const riskTop = parseFloat(riskScene.dataset.absoluteTop || "0");
+        const riskPinOffset = parseFloat(riskScene.dataset.pinOffset || "0");
+        const riskPinDuration = parseFloat(riskScene.dataset.pinDuration || "1");
+        const riskTransitionOutStart = parseFloat(riskScene.dataset.transitionOutStart || "0.88");
+        const riskPinStart = riskTop - riskPinOffset;
+        const riskPinEnd = riskPinStart + riskPinDuration;
+        const riskExitStartY = riskPinStart + (riskPinDuration * riskTransitionOutStart);
+
+        activeStart = riskExitStartY;
+        handoffStart = riskExitStartY + 70;
+        handoffEnd = riskPinEnd;
+    }
+
+    const handoffReveal = smoothStep(handoffStart, handoffEnd, currentDesignY);
+    const isPinned = getScenePinnedState(currentDesignY, activeStart, pinEnd);
     const content = pinLayer.querySelector(".vaccine-pin-content");
     const title = pinLayer.querySelector(".vaccine-title");
     const plots = pinLayer.querySelector(".vaccine-plots");
@@ -1457,16 +1648,19 @@ function updateVaccinationScrolly(currentDesignY) {
     const comparisonCard = pinLayer.querySelector(".vaccine-card-comparison");
     const comparisonDetailCard = pinLayer.querySelector(".vaccine-card-detail");
 
-    const sceneFadeIn = smoothStep(0.00, 0.10, overallProgress);
-    const sceneFadeOut = 1 - smoothStep(0.965, 1.0, overallProgress);
-    const sceneOpacity = isPinned ? Math.min(sceneFadeIn, sceneFadeOut) : 0;
+    const vaccineHandoffDuration = 400;
+    const vaccineFadeStart = (pinDuration - vaccineHandoffDuration) / pinDuration;
+    const sceneFadeOut = 1 - smoothStep(vaccineFadeStart, 1.0, overallProgress);
+    const sceneOpacity = isPinned ? Math.min(handoffReveal, sceneFadeOut) : 0;
 
     pinLayer.classList.toggle("is-active", isPinned);
     pinLayer.style.opacity = sceneOpacity.toFixed(3);
 
     if (content !== null) {
+        const enterY = Math.round(lerp(18, 0, handoffReveal));
         content.style.top = `${Math.round(getPinOffsetY())}px`;
         content.style.opacity = sceneOpacity.toFixed(3);
+        content.style.transform = `translate3d(-50%, ${enterY}px, 0) scale(var(--pin-scale))`;
     }
 
     if (title !== null) {
@@ -1474,10 +1668,12 @@ function updateVaccinationScrolly(currentDesignY) {
         const titleTop = Math.round(lerp(408, 126, titleMoveProgress));
         title.style.top = `${titleTop}px`;
         title.style.opacity = sceneOpacity.toFixed(3);
+        title.style.filter = `blur(${lerp(2.0, 0, handoffReveal).toFixed(2)}px)`;
     }
 
     if (plots !== null) {
-        const plotProgress = smoothStep(0.44, 0.60, overallProgress);
+        const plotIntro = smoothStep(0.44, 0.60, overallProgress);
+        const plotProgress = plotIntro * handoffReveal;
         const plotY = lerp(54, 0, plotProgress);
         const plotScale = lerp(1.02, 1.0, plotProgress);
         const plotBlur = lerp(8, 0, plotProgress);
@@ -1489,29 +1685,60 @@ function updateVaccinationScrolly(currentDesignY) {
         });
     }
 
+    const scrollDist = currentDesignY - pinStart;
+
+    const vaccineSequenceEnd = pinDuration - vaccineHandoffDuration;
+    const vaccineSequenceConfig = isMobileLayout()
+        ? { startPadding: 820, gap: 140 }
+        : { startPadding: 980, gap: 160 };
+
     if (sourceCard !== null) {
-    setVaccineCardScrollPosition(sourceCard, clamp((overallProgress - 0.12) / 0.28, 0, 1), 940, -340);
+        setVaccineCardScrollPosition(
+            sourceCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                0,
+                3,
+                vaccineSequenceEnd,
+                vaccineSequenceConfig
+            )
+        );
     }
-
     if (comparisonCard !== null) {
-        setVaccineCardScrollPosition(comparisonCard, clamp((overallProgress - 0.40) / 0.36, 0, 1), 940, -340);
+        setVaccineCardScrollPosition(
+            comparisonCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                1,
+                3,
+                vaccineSequenceEnd,
+                vaccineSequenceConfig
+            )
+        );
     }
-
     if (comparisonDetailCard !== null) {
-        setVaccineCardScrollPosition(comparisonDetailCard, clamp((overallProgress - 0.76) / 0.36, 0, 1), 940, -340);
+        setVaccineCardScrollPosition(
+            comparisonDetailCard,
+            getMobileSequenceProgress(
+                scrollDist,
+                2,
+                3,
+                vaccineSequenceEnd,
+                vaccineSequenceConfig
+            )
+        );
     }
 }
 
 
 function makeEffectivenessQuestionBlock() {
     const block = makeElement("div", "effectiveness-question-block");
+    setBox(block, 260, 0, 1400, 1080);
 
     const title = makeElement("h2", "title section-title effectiveness-question-title", "The <span class=\"blue\">Effectiveness</span> of Vaccination");
-    setBox(title, 500, 0, 920);
     block.appendChild(title);
 
     const subtitle = makeElement("p", "subtitle effectiveness-question-subtitle", "How many people <span class=\"blue\">developed herpes zoster</span><br>in the placebo group and in the vaccinated group?");
-    setBox(subtitle, 410, 115, 1100);
     block.appendChild(subtitle);
 
     return block;
@@ -2236,7 +2463,10 @@ function updateEffectivenessScrolly(currentDesignY) {
     const pinStart = sceneTop - pinOffset;
     const pinEnd = pinStart + pinDuration;
     const overallProgress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
-    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
+    const effectivenessHandoffDuration = 400;
+    const effectivenessHandoffStart = pinStart - effectivenessHandoffDuration;
+    const handoffReveal = smoothStep(effectivenessHandoffStart, pinStart, currentDesignY);
+    const isPinned = getScenePinnedState(currentDesignY, effectivenessHandoffStart, pinEnd);
 
     const content = pinLayer.querySelector(".effectiveness-pin-content");
     const questionBlock = pinLayer.querySelector(".effectiveness-question-block");
@@ -2247,7 +2477,7 @@ function updateEffectivenessScrolly(currentDesignY) {
     const summaryCard = pinLayer.querySelector(".effectiveness-summary-card");
 
     const scrollDist = currentDesignY - pinStart;
-    const CARD_PASS = 2000;
+    const CARD_PASS = SPEECH_SCROLL_DISTANCE;
     const F1 = 2600;
     const F2 = 4100;
     let chartScroll;
@@ -2268,15 +2498,23 @@ function updateEffectivenessScrolly(currentDesignY) {
     }
     const contentProgress = clamp(chartScroll / 5150, 0, 1);
     const vaccCardEnd = (F1 + CARD_PASS) + (F2 - F1) + CARD_PASS;
-    const layerExitFade = 1 - clamp((scrollDist - vaccCardEnd) / 400, 0, 1);
+    const handoffDuration = 400;
+    const handoffStart = pinDuration - handoffDuration;
+    const layerExitFade = 1 - smoothStep(handoffStart, pinDuration, scrollDist);
+    const heldContentProgress = scrollDist >= vaccCardEnd
+        ? Math.min(contentProgress, 0.82)
+        : contentProgress;
+
+    const sceneLayerOpacity = isPinned ? Math.min(handoffReveal, layerExitFade) : 0;
 
     pinLayer.classList.toggle("is-active", isPinned);
-    pinLayer.style.opacity = isPinned ? layerExitFade.toFixed(3) : "0";
+    pinLayer.style.opacity = sceneLayerOpacity.toFixed(3);
 
     if (content !== null) {
+        const enterY = Math.round(lerp(14, 0, handoffReveal));
         content.style.top = `${Math.round(getPinOffsetY())}px`;
-        content.style.opacity = isPinned ? layerExitFade.toFixed(3) : "0";
-        content.style.transform = `translate3d(-50%, 0px, 0) scale(var(--pin-scale))`;
+        content.style.opacity = "1";
+        content.style.transform = `translate3d(-50%, ${enterY}px, 0) scale(var(--pin-scale))`;
     }
 
     if (questionBlock !== null) {
@@ -2286,15 +2524,15 @@ function updateEffectivenessScrolly(currentDesignY) {
         questionBlock.style.transform = `translate3d(0, ${Math.round(lerp(0, -24, questionLift))}px, 0)`;
     }
 
-    setUnifiedEffectivenessChartState(mainChart, contentProgress);
-    renderEffectivenessCanvas(contentProgress);
+    setUnifiedEffectivenessChartState(mainChart, heldContentProgress);
+    renderEffectivenessCanvas(heldContentProgress);
 
     if (placeboCard !== null) {
-        setVaccineCardScrollPosition(placeboCard, clamp(placeboCardP, 0, 1), 1080, -470);
+        setVaccineCardScrollPosition(placeboCard, clamp(placeboCardP, 0, 1));
     }
 
     if (vaccinatedCard !== null) {
-        setVaccineCardScrollPosition(vaccinatedCard, clamp(vaccCardP, 0, 1), 1080, -470);
+        setVaccineCardScrollPosition(vaccinatedCard, clamp(vaccCardP, 0, 1));
     }
 }
 
@@ -2358,16 +2596,18 @@ function updateReliabilityScrolly(currentDesignY) {
     currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
     const pinStart = sceneTop - pinOffset;
     const pinEnd = pinStart + pinDuration;
+    const handoffDuration = 400;
+    const handoffStart = pinStart - handoffDuration;
     const progress = clamp((currentDesignY - pinStart) / pinDuration, 0, 1);
-    const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
+    const handoffReveal = clamp((currentDesignY - handoffStart) / handoffDuration, 0, 1);
+    const isPinned = getScenePinnedState(currentDesignY, handoffStart, pinEnd);
     const content = pinLayer.querySelector(".reliability-pin-content");
     const title = pinLayer.querySelector(".reliability-title");
     const card = pinLayer.querySelector(".reliability-card");
     const cardProgress = 0;
     const cardHasLeft = false;
-    const layerReveal = smoothStep(0.0, 0.16, progress);
     const layerFade = 1 - smoothStep(0.82, 1.0, progress);
-    const layerOpacity = isPinned ? Math.min(layerReveal, layerFade) : 0;
+    const layerOpacity = isPinned ? Math.min(handoffReveal, layerFade) : 0;
 
     pinLayer.classList.toggle("is-active", isPinned);
     pinLayer.style.opacity = layerOpacity.toFixed(3);
@@ -3002,9 +3242,9 @@ function createEffectivenessRangePinLayer() {
 }
 
 function addEffectivenessRangeScrollScene(sectionName, absoluteTop) {
-    const sceneHeight = 8600;
+    const sceneHeight = 11950;
     const pinOffset = 0;
-    const pinDuration = 8600;
+    const pinDuration = 11950;
     const scene = makeElement('div', 'effectiveness-range-scrolly');
     scene.dataset.absoluteTop = String(absoluteTop);
     scene.dataset.sceneHeight = String(sceneHeight);
@@ -3028,8 +3268,7 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
     const pinDuration = parseFloat(scene.dataset.pinDuration || '1');
     currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
-    const actualDesignY = readDesignScrollY();
-    const progressDesignY = actualDesignY > currentDesignY ? actualDesignY : currentDesignY;
+    const progressDesignY = currentDesignY;
 
     const pinStart = sceneTop - pinOffset;
     const pinEnd = pinStart + pinDuration;
@@ -3242,8 +3481,8 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
         countEnd: 0.38,
         countDesignStart: -150,
         countDesignEnd: 550,
-        fadeStart: 0.52,
-        fadeEnd: 0.58,
+        fadeStart: 0.629,
+        fadeEnd: 0.689,
         rangeStart: 30,
         rangeEnd: 36,
         meanValue: 33,
@@ -3251,16 +3490,16 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     });
 
     setPinnedRangeChartState(vaccinatedChart, {
-        revealStart: 0.58,
-        revealEnd: 0.66,
-        dotStart: 0.62,
-        dotEnd: 0.73,
-        rangeVisualStart: 0.74,
-        rangeVisualEnd: 0.81,
-        countStart: 0.68,
-        countEnd: 0.82,
-        fadeStart: 0.88,
-        fadeEnd: 0.92,
+        revealStart: 0.629,
+        revealEnd: 0.689,
+        dotStart: 0.649,
+        dotEnd: 0.759,
+        rangeVisualStart: 0.769,
+        rangeVisualEnd: 0.839,
+        countStart: 0.709,
+        countEnd: 0.849,
+        fadeStart: 0.969,
+        fadeEnd: 1.00,
         rangeStart: 14,
         rangeEnd: 19,
         meanValue: 16,
@@ -3268,54 +3507,70 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     });
 
     if (placeboCard !== null) {
-        setVaccineCardScrollPosition(placeboCard, clamp((progress - 0.50) / 0.18, 0, 1), 1080, -430);
+        setVaccineCardScrollPosition(placeboCard, getSpeechProgress(scrollDist, 1600));
     }
 
     if (vaccinatedCard !== null) {
-        setVaccineCardScrollPosition(vaccinatedCard, clamp((progress - 0.81) / 0.13, 0, 1), 1080, -430);
+        setVaccineCardScrollPosition(vaccinatedCard, getSpeechProgress(scrollDist, 3300));
     }
 
     setPinnedCompareState(rangeCompare, {
-        revealStart: 0.915,
-        revealEnd: 0.940,
-        dotStart: 0.932,
-        dotEnd: 0.965,
-        rangeVisualStart: 0.965,
-        rangeVisualEnd: 0.978,
-        countStart: 0.945,
-        countEnd: 0.980,
-        arrowStart: 0.972,
-        arrowEnd: 0.985,
+        revealStart: 0.969,
+        revealEnd: 1.000,
+        dotStart: 0.965,
+        dotEnd: 0.982,
+        rangeVisualStart: 0.978,
+        rangeVisualEnd: 0.990,
+        countStart: 0.972,
+        countEnd: 0.992,
+        arrowStart: 0.985,
+        arrowEnd: 0.996,
         fadeStart: 2.0,
         fadeEnd: 2.0
     });
 
-    const compareFade = 1 - smoothStep(0.50, 0.62, outroProgress);
+    const outroDist = scrollDist - buildDuration;
+    const compareFade = 1 - smoothStep(4495, 4795, outroDist);
     if (rangeCompare !== null && scrollDist >= buildDuration) {
         const compareContainerOpacity = layerOpacity * compareFade;
         rangeCompare.style.opacity = compareContainerOpacity.toFixed(3);
         rangeCompare.style.visibility = compareContainerOpacity > 0.02 ? 'visible' : 'hidden';
     }
 
-    if (compareLowerCard !== null) {
-        setVaccineCardScrollPosition(compareLowerCard, clamp(outroProgress / 0.24, 0, 1), 1080, -470);
-        compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
-    }
 
-    if (compareMeanDifferenceCard !== null) {
-        setVaccineCardScrollPosition(compareMeanDifferenceCard, clamp((outroProgress - 0.20) / 0.26, 0, 1), 1080, -470);
-        compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
-    }
-
-    if (compareOverallCard !== null) {
-        setVaccineCardScrollPosition(compareOverallCard, clamp((outroProgress - 0.42) / 0.26, 0, 1), 1080, -470);
-        compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
+    if (isMobileLayout()) {
+        const mobileCompareSequenceEnd = 4495;
+        if (compareLowerCard !== null) {
+            setVaccineCardScrollPosition(compareLowerCard, getMobileSequenceProgress(outroDist, 0, 3, mobileCompareSequenceEnd, { gap: 90 }));
+            compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
+        if (compareMeanDifferenceCard !== null) {
+            setVaccineCardScrollPosition(compareMeanDifferenceCard, getMobileSequenceProgress(outroDist, 1, 3, mobileCompareSequenceEnd, { gap: 90 }));
+            compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
+        if (compareOverallCard !== null) {
+            setVaccineCardScrollPosition(compareOverallCard, getMobileSequenceProgress(outroDist, 2, 3, mobileCompareSequenceEnd, { gap: 90 }));
+            compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
+    } else {
+        if (compareLowerCard !== null) {
+            setVaccineCardScrollPosition(compareLowerCard, getSpeechProgress(outroDist, 0));
+            compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
+        if (compareMeanDifferenceCard !== null) {
+            setVaccineCardScrollPosition(compareMeanDifferenceCard, getSpeechProgress(outroDist, 1450));
+            compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
+        if (compareOverallCard !== null) {
+            setVaccineCardScrollPosition(compareOverallCard, getSpeechProgress(outroDist, 2900));
+            compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
+        }
     }
 
     const safetyIntro = pinLayer.querySelector('.effectiveness-range-safety-intro');
     if (safetyIntro !== null) {
-        const introReveal = smoothStep(0.68, 0.76, outroProgress);
-        const introFadeOut = 1 - smoothStep(0.92, 0.99, outroProgress);
+        const introReveal = smoothStep(4495, 4795, outroDist);
+        const introFadeOut = 1 - smoothStep(6395, 6745, outroDist);
         const introOpacity = layerOpacity * Math.min(introReveal, introFadeOut);
         safetyIntro.style.opacity = introOpacity.toFixed(3);
         safetyIntro.style.visibility = introOpacity > 0.02 ? 'visible' : 'hidden';
@@ -3323,12 +3578,11 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
     }
 
     if (safetyInfoCard !== null) {
-        const infoProgress = clamp((outroProgress - 0.78) / 0.20, 0, 1);
-        setOpaqueSpeechCardScrollPosition(safetyInfoCard, infoProgress, 1080, -470);
+        setOpaqueSpeechCardScrollPosition(safetyInfoCard, getSpeechProgress(outroDist, 4800));
     }
 
     if (safetyFirstChart !== null) {
-        const chartReveal = smoothStep(0.92, 1.0, outroProgress);
+        const chartReveal = smoothStep(6665, 6945, outroDist);
         const chartOpacity = chartReveal;
         safetyFirstChart.style.opacity = chartOpacity.toFixed(3);
         safetyFirstChart.style.visibility = chartOpacity > 0.02 ? 'visible' : 'hidden';
@@ -3347,11 +3601,20 @@ function createMobileHeroLayer() {
     const layer = makeElement("div", "mobile-hero-layer");
     const content = makeElement("div", "mobile-hero-content");
     const title = makeElement("h1", "title main-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
-    setBox(title, 455, 399, 1010);
+    setBox(title, 455, 319, 1010);
     content.appendChild(title);
 
     const hint = makeElement("div", "mobile-scroll-hint", "<span class=\"scroll-guide\">Keep scrolling as you read to follow the story.</span><span class=\"scroll-label\">Scroll Down</span><span class=\"scroll-arrow\" aria-hidden=\"true\">↓</span>");
-    hint.setAttribute("aria-hidden", "true");
+    hint.setAttribute("role", "button");
+    hint.setAttribute("tabindex", "0");
+    hint.setAttribute("aria-label", "Scroll to the first story scene");
+    hint.addEventListener("click", scrollToBurden);
+    hint.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            scrollToBurden();
+        }
+    });
 
     layer.appendChild(content);
     layer.appendChild(hint);
@@ -3366,12 +3629,6 @@ function updateMobileHeroLayer(currentDesignY) {
         return;
     }
 
-    if (!isMobileLayout()) {
-        layer.classList.remove("is-active");
-        layer.style.opacity = "0";
-        return;
-    }
-
     const firstPinnedScene = document.querySelector(".disease-scrolly");
     const firstSceneTop = firstPinnedScene !== null
         ? parseFloat(firstPinnedScene.dataset.absoluteTop || "1260")
@@ -3379,67 +3636,219 @@ function updateMobileHeroLayer(currentDesignY) {
     const firstPinOffset = firstPinnedScene !== null
         ? parseFloat(firstPinnedScene.dataset.pinOffset || "150")
         : 150;
-    const heroEnd = firstSceneTop - firstPinOffset;
+    const pinStart = firstSceneTop - firstPinOffset;
+    const handoffStart = pinStart - 420;
+    const handoffEnd = pinStart + 40;
     const actualDesignY = readDesignScrollY();
     const heroProgressY = Math.max(currentDesignY || 0, actualDesignY || 0);
-    const isActive = heroProgressY < heroEnd;
-    const fadeOut = smoothStep(heroEnd - 260, heroEnd, heroProgressY);
-    const opacity = isActive ? (1 - fadeOut) : 0;
+    const handoff = smoothStep(handoffStart, handoffEnd, heroProgressY);
+    const opacity = 1 - handoff;
     const content = layer.querySelector(".mobile-hero-content");
 
     layer.classList.toggle("is-active", opacity > 0.01);
     layer.style.opacity = opacity.toFixed(3);
+    layer.style.visibility = opacity > 0.01 ? 'visible' : 'hidden';
 
     if (content !== null) {
+        const lift = lerp(0, -16, handoff);
         content.style.top = `${Math.round(getPinOffsetY())}px`;
         content.style.opacity = opacity.toFixed(3);
+        content.style.transform = `translate3d(-50%, ${lift.toFixed(2)}px, 0) scale(var(--pin-scale))`;
+        content.style.filter = `blur(${lerp(0, 1.8, handoff).toFixed(2)}px)`;
     }
+}
+
+let controlledScrollAnimationId = null;
+
+function animateWindowToDesignY(targetDesignY, duration) {
+    if (controlledScrollAnimationId !== null) {
+        window.cancelAnimationFrame(controlledScrollAnimationId);
+        controlledScrollAnimationId = null;
+    }
+
+    const targetTop = designYToScrollTop(targetDesignY);
+    if (prefersReducedMotion || !(duration > 0)) {
+        window.scrollTo({ top: targetTop, behavior: "auto" });
+        scrollState.targetDesignY = targetDesignY;
+        scrollState.currentDesignY = targetDesignY;
+        updateScrollDrivenScenes(targetDesignY);
+        return;
+    }
+
+    const startTop = window.scrollY;
+    const distance = targetTop - startTop;
+    const startTime = performance.now();
+
+    const frame = (now) => {
+        const progress = clamp((now - startTime) / duration, 0, 1);
+        const eased = progress < 0.5
+            ? 4 * progress * progress * progress
+            : 1 - (Math.pow(-2 * progress + 2, 3) / 2);
+        const nextTop = startTop + (distance * eased);
+
+        window.scrollTo({ top: nextTop, behavior: "auto" });
+
+        if (progress < 1) {
+            controlledScrollAnimationId = window.requestAnimationFrame(frame);
+        } else {
+            controlledScrollAnimationId = null;
+            window.scrollTo({ top: targetTop, behavior: "auto" });
+            scrollState.targetDesignY = targetDesignY;
+            scrollState.currentDesignY = targetDesignY;
+            updateScrollDrivenScenes(targetDesignY);
+        }
+    };
+
+    controlledScrollAnimationId = window.requestAnimationFrame(frame);
 }
 
 function scrollToBurden() {
     const scene = document.querySelector(".disease-scrolly");
 
     if (scene !== null) {
-        const scale = getScale();
         const targetDesignY = getDiseaseNavigationTop();
-        scrollState.targetDesignY = targetDesignY;
-        if (prefersReducedMotion) {
-            scrollState.currentDesignY = targetDesignY;
-        }
-        window.scrollTo({ top: targetDesignY * scale, behavior: prefersReducedMotion ? "auto" : "smooth" });
-        requestScrollSceneFrame();
+        animateWindowToDesignY(targetDesignY, 1050);
     }
 }
 
+let landingFirstScrollHandled = false;
+let landingScrollSnapInProgress = false;
+
+function handleLandingFirstWheel(event) {
+    if (event.deltaY <= 0) {
+        return;
+    }
+
+    if (landingScrollSnapInProgress) {
+        event.preventDefault();
+        return;
+    }
+
+    if (landingFirstScrollHandled) {
+        return;
+    }
+
+    const targetDesignY = getDiseaseNavigationTop();
+    const currentDesignY = readDesignScrollY();
+    const isOnLandingScreen = currentDesignY < Math.min(320, targetDesignY * 0.3);
+
+    if (!isOnLandingScreen) {
+        return;
+    }
+
+    event.preventDefault();
+    landingFirstScrollHandled = true;
+    landingScrollSnapInProgress = true;
+    scrollToBurden();
+
+    window.setTimeout(() => {
+        landingScrollSnapInProgress = false;
+    }, prefersReducedMotion ? 80 : 1120);
+}
+
+let decisionWheelGestureCount = 0;
+let decisionWheelGestureActive = false;
+let decisionWheelGestureTimer = null;
+let decisionBubbleSnapInProgress = false;
+
+function handleDecisionIntroWheel(event) {
+    if (event.deltaY <= 0 || typeof SAFETY_SCENE_DEFS === "undefined") {
+        return;
+    }
+
+    const introDef = SAFETY_SCENE_DEFS.find((def) => def.id === "decision-intro");
+    const bubbleDef = SAFETY_SCENE_DEFS.find((def) => def.id === "decision-conclusion");
+
+    if (!introDef || !bubbleDef || !Number.isFinite(introDef._top) || !Number.isFinite(bubbleDef._top)) {
+        return;
+    }
+
+    const currentDesignY = readDesignScrollY();
+    const introEnd = introDef._top + introDef._pinDuration;
+    const isInsideDecisionIntro = currentDesignY >= introDef._top && currentDesignY < introEnd;
+
+    if (!isInsideDecisionIntro) {
+        decisionWheelGestureCount = 0;
+        decisionWheelGestureActive = false;
+        if (decisionWheelGestureTimer !== null) {
+            window.clearTimeout(decisionWheelGestureTimer);
+            decisionWheelGestureTimer = null;
+        }
+        return;
+    }
+
+    if (decisionBubbleSnapInProgress) {
+        event.preventDefault();
+        return;
+    }
+
+    if (!decisionWheelGestureActive) {
+        decisionWheelGestureActive = true;
+        decisionWheelGestureCount += 1;
+    }
+
+    if (decisionWheelGestureTimer !== null) {
+        window.clearTimeout(decisionWheelGestureTimer);
+    }
+    decisionWheelGestureTimer = window.setTimeout(() => {
+        decisionWheelGestureActive = false;
+        decisionWheelGestureTimer = null;
+    }, 180);
+
+    if (decisionWheelGestureCount < 2) {
+        return;
+    }
+
+    event.preventDefault();
+    decisionBubbleSnapInProgress = true;
+    decisionWheelGestureCount = 0;
+
+    const targetDesignY = bubbleDef._top + 430;
+    scrollState.targetDesignY = targetDesignY;
+    if (prefersReducedMotion) {
+        scrollState.currentDesignY = targetDesignY;
+    }
+    window.scrollTo({
+        top: designYToScrollTop(targetDesignY),
+        behavior: prefersReducedMotion ? "auto" : "smooth"
+    });
+    requestScrollSceneFrame();
+
+    window.setTimeout(() => {
+        decisionBubbleSnapInProgress = false;
+        decisionWheelGestureActive = false;
+    }, prefersReducedMotion ? 80 : 850);
+}
+
 function renderIntro() {
-    const mainTitle = makeElement("h1", "title main-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
-    appendElement("intro", mainTitle, 455, 399, 1010);
+    const mainTitle = makeElement("h1", "title main-title landing-static-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
+    appendElement("intro", mainTitle, 455, 329, 1010);
 
     addScrollButton("intro");
 
     addDiseaseScrollScene("intro", 1260);
 
-    addRiskScrollScene("intro", 3140);
+    addRiskScrollScene("intro", 3585);
 
-    addVaccinationScrollScene("intro", 5200);
+    addVaccinationScrollScene("intro", 6460);
 }
 
 function renderEffectiveness() {
-    addEffectivenessIntroScene("effectiveness", 7150);
+    addEffectivenessIntroScene("effectiveness", 11005);
 }
 
 function renderUncertainty() {
-    addReliabilityScrollScene("uncertainty", 15650);
-    addUncertaintyConceptScrollScene("uncertainty", 16800);
+    addReliabilityScrollScene("uncertainty", 19505);
+    addUncertaintyConceptScrollScene("uncertainty", 20655);
 }
 
 function renderEffectivenessRange() {
-    addEffectivenessRangeScrollScene('effectivenessRange', 25000);
+    addEffectivenessRangeScrollScene('effectivenessRange', 28855);
 }
 
 function renderSafety() {
     addChart("safety", {
-        top: 28306,
+        top: 34911,
         className: 'safety-first-chart',
         title: "Serious Adverse Event<br>in the <span class=\"blue\">Placebo</span> Group",
         count: 22,
@@ -3448,10 +3857,10 @@ function renderSafety() {
         legend: "Case of serious adverse event",
         hasRange: false
     });
-    addCard("safety", "<span class=\"purple\">The study shows that</span> about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 29155);
+    addCard("safety", "<span class=\"purple\">The study shows that</span> about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 30140);
 
     addChart("safety", {
-        top: 29810,
+        top: 30795,
         title: "Serious Adverse Event<br>in the <span class=\"blue\">Vaccinated</span> Group",
         count: 23,
         colour: "purple",
@@ -3459,11 +3868,11 @@ function renderSafety() {
         legend: "Case of serious adverse event",
         hasRange: false
     });
-    addCard("safety", "The study shows that about <span class=\"purple\">23</span> in every 1000 people who receive the vaccine<br>had serious adverse events.", 30695);
-    addCard("safety", "But how about uncertainty in the study data?", 31426);
+    addCard("safety", "The study shows that about <span class=\"purple\">23</span> in every 1000 people who receive the vaccine<br>had serious adverse events.", 31680);
+    addCard("safety", "But how about uncertainty in the study data?", 32411);
 
     addChart("safety", {
-        top: 31888,
+        top: 32873,
         title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Placebo</span> Group",
         count: 22,
         colour: "purple",
@@ -3473,10 +3882,10 @@ function renderSafety() {
         legend: "Case of serious adverse event",
         hasRange: true
     });
-    addCard("safety", "The number of people who experience a serious adverse event in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 32779);
+    addCard("safety", "The number of people who experience a serious adverse event in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 33764);
 
     addChart("safety", {
-        top: 33466,
+        top: 34451,
         title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Vaccinated</span> Group",
         count: 23,
         colour: "purple",
@@ -3486,10 +3895,10 @@ function renderSafety() {
         legend: "Case of serious adverse event",
         hasRange: true
     });
-    addCard("safety", "The number of people who experience a serious adverse event in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 34356);
+    addCard("safety", "The number of people who experience a serious adverse event in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 35341);
 
     addCompare("safety", {
-        top: 35042,
+        top: 36027,
         title: "The Serious Adverse Event of Vaccination",
         colour: "purple",
         arrowFile: "arrow2.png",
@@ -3508,16 +3917,16 @@ function renderSafety() {
             mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)"
         }
     });
-    addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 35984);
-    addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 36345);
-    addCard("safety", "This indicates no clear difference between the vaccinated and placebo groups in<br>serious adverse events.", 36706);
+    addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 36969);
+    addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 37330);
+    addCard("safety", "This indicates no clear difference between the vaccinated and placebo groups in<br>serious adverse events.", 37691);
 }
 
 function renderClosing() {
-    addCard("closing", "This information may help you consider the possible benefits and harms of vaccination, while keeping the uncertainty inherent in the evidence in mind.", 37421);
-    addImage("closing", "own_factors_transparent_highres.png", "Personal factors for vaccination decision", 435, 37787, 1050, 847, "own-factors");
-    addCard("closing", "However, the results should be interpreted alongside your personal risk of herpes zoster and relevant circumstances, including your age, immune status, and medical history, for an informed vaccination decision.", 38699);
-    addParagraph("closing", "Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.", "closing final-message", 260, 39357, 1400);
+    addCard("closing", "This information may help you consider the possible benefits and harms of vaccination, while keeping the uncertainty inherent in the evidence in mind.", 38406);
+    addImage("closing", "own_factors_transparent_highres.png", "Personal factors for vaccination decision", 435, 38772, 1050, 847, "own-factors");
+    addCard("closing", "However, the results should be interpreted alongside your personal risk of herpes zoster and relevant circumstances, including your age, immune status, and medical history, for an informed vaccination decision.", 39684);
+    addParagraph("closing", "Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.", "closing final-message", 260, 40342, 1400);
 }
 
 function runRangeCountUp(meanElement) {
@@ -3639,6 +4048,35 @@ function setupRevealObserver() {
     });
 }
 
+function addTopProgressBar() {
+    if (document.querySelector('.story-top-progress') !== null) {
+        return;
+    }
+
+    const bar = makeElement('div', 'story-top-progress');
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', 'Article reading progress');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', '0');
+    const fill = makeElement('div', 'story-top-progress-fill');
+    bar.appendChild(fill);
+    document.body.appendChild(bar);
+    updateTopProgressBar();
+}
+
+function updateTopProgressBar() {
+    const bar = document.querySelector('.story-top-progress');
+    const fill = document.querySelector('.story-top-progress-fill');
+    if (bar === null || fill === null) {
+        return;
+    }
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const progress = clamp(window.scrollY / maxScroll, 0, 1);
+    fill.style.transform = `scaleX(${progress.toFixed(5)})`;
+    bar.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+}
+
 function addProgressRail() {
     const rail = makeElement("nav", "progress-rail");
     rail.setAttribute("aria-label", "Story sections");
@@ -3650,12 +4088,8 @@ function addProgressRail() {
         button.setAttribute("aria-label", `Go to ${section.label} section`);
         button.addEventListener("click", () => {
             const designTop = getNavSectionTop(section);
-            const top = designTop * getScale();
-            scrollState.targetDesignY = designTop;
-            if (prefersReducedMotion) {
-                scrollState.currentDesignY = designTop;
-            }
-            window.scrollTo({ top, behavior: prefersReducedMotion ? "auto" : "smooth" });
+            const duration = isMobileLayout() ? 820 : 980;
+            animateWindowToDesignY(designTop, prefersReducedMotion ? 0 : duration);
             requestScrollSceneFrame();
         });
         rail.appendChild(button);
@@ -3667,7 +4101,7 @@ function addProgressRail() {
 
 function updateProgressRail() {
     const scale = getScale();
-    const currentY = window.scrollY / scale;
+    const currentY = readDesignScrollY();
     let activeKey = navSections[0].key;
 
     navSections.forEach((section) => {
@@ -3691,10 +4125,15 @@ function updateProgressRail() {
 let storyScroller = null;
 const SCROLLAMA_STEP_SIZE = 900;
 
+function isTimelineStretched() {
+    return document.documentElement.dataset.timelineStretched === "true";
+}
+
 function getTotalDesignHeight() {
     const canvas = document.getElementById("canvas");
     const inlineHeight = canvas ? parseFloat(canvas.style.height || "0") : 0;
-    return inlineHeight || designHeight;
+    const physicalDesignHeight = inlineHeight || designHeight;
+    return isTimelineStretched() ? physicalDesignHeight / TIMELINE_SCALE : physicalDesignHeight;
 }
 
 function buildScrollamaSteps() {
@@ -3717,8 +4156,8 @@ function buildScrollamaSteps() {
         step.dataset.designStart = String(start);
         step.dataset.designEnd = String(end);
         step.dataset.stepIndex = String(index);
-        step.style.top = `calc(${start}px * var(--scale))`;
-        step.style.height = `calc(${Math.max(1, end - start)}px * var(--scale))`;
+        step.style.top = `calc(${start * TIMELINE_SCALE}px * var(--scale))`;
+        step.style.height = `calc(${Math.max(1, end - start) * TIMELINE_SCALE}px * var(--scale))`;
         container.appendChild(step);
     }
 
@@ -3778,9 +4217,9 @@ function setupScrollamaState() {
     renderFromScrollama();
 }
 
-const SAFETY_PIN_BASE = 33320;   
+const SAFETY_PIN_BASE = 40525;   
 const PAGE_REVEAL = 2600;        
-const STANDARD_BUBBLE_TRAVEL = 2000;
+const STANDARD_BUBBLE_TRAVEL = SPEECH_SCROLL_DISTANCE;
 const PAGE_BUBBLE = STANDARD_BUBBLE_TRAVEL;        
 const PAGE_FADE = 1100;          
 
@@ -3831,7 +4270,7 @@ const SAFETY_SCENE_DEFS = [
     {
         id: 'decision-conclusion', kind: 'bubbles',
         bubbleSpacing: 1900,
-        bubbleTravel: 2300,
+        bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         bubbles: [
             '<span class="grey">Overall, this study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while there are likely</span> no clear evidence of a difference in serious adverse events between groups.'
         ]
@@ -3843,7 +4282,7 @@ const SAFETY_SCENE_DEFS = [
         revealDist: 1800,
         bgStart: 300,
         bubbleSpacing: 1900,
-        bubbleTravel: 2200,
+        bubbleTravel: STANDARD_BUBBLE_TRAVEL,
         imageFile: 'own_factors_transparent_highres.png', imageAlt: 'Personal factors for vaccination decision',
         bubbles: [
             '<span class="grey">However, these findings describe</span> average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster <span class="grey">influenced by age, immune status, medical history.</span>',
@@ -4221,14 +4660,13 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
             return;
         }
         const p = clamp((scrollDist - bubbleBase - (i * bubbleSpacing)) / bubbleTravel, 0, 1);
-        setVaccineCardScrollPosition(card, p, 1080, -470);
+        setVaccineCardScrollPosition(card, p);
     });
 }
 
 function updatePinnedPages(currentDesignY) {
     currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
-    const actualDesignY = readDesignScrollY();
-    const progressDesignY = actualDesignY > currentDesignY ? actualDesignY : currentDesignY;
+    const progressDesignY = currentDesignY;
     SAFETY_SCENE_DEFS.forEach((def) => updatePinnedPage(def, currentDesignY, progressDesignY));
 }
 
@@ -4248,7 +4686,7 @@ function buildSafetyScenes() {
     }
 
     const msgDef = SAFETY_SCENE_DEFS[SAFETY_SCENE_DEFS.length - 1];
-    const designViewport = window.innerHeight / getScale();
+    const designViewport = window.innerHeight / (getScale() * TIMELINE_SCALE);
     const messageRevealEnd = msgDef._top + PAGE_MESSAGE_REVEAL;
     const totalDesign = messageRevealEnd + 800 + designViewport;
     const canvas = document.getElementById('canvas');
@@ -4469,6 +4907,62 @@ function applyResponsiveCardSizing() {
     }
 }
 
+function scaleInlinePixelValue(element, propertyName, factor) {
+    const raw = element.style[propertyName];
+    if (!raw || !raw.endsWith("px")) {
+        return;
+    }
+    const value = parseFloat(raw);
+    if (Number.isFinite(value)) {
+        element.style[propertyName] = `${value * factor}px`;
+    }
+}
+
+function applyTimelineStretch() {
+    if (isTimelineStretched()) {
+        return;
+    }
+
+    document.querySelectorAll(".story-section").forEach((section) => {
+        const computed = window.getComputedStyle(section);
+        const sectionTop = parseFloat(computed.top || "0");
+        const sectionHeight = parseFloat(computed.height || "0");
+
+        if (Number.isFinite(sectionTop)) {
+            section.style.top = `${sectionTop * TIMELINE_SCALE}px`;
+        }
+        if (Number.isFinite(sectionHeight)) {
+            section.style.height = `${sectionHeight * TIMELINE_SCALE}px`;
+        }
+
+        Array.from(section.children).forEach((child) => {
+
+            if (child.id !== "scrollButton") {
+                scaleInlinePixelValue(child, "top", TIMELINE_SCALE);
+            }
+            if (child.dataset && child.dataset.sceneHeight !== undefined) {
+                scaleInlinePixelValue(child, "height", TIMELINE_SCALE);
+            }
+        });
+    });
+
+    const canvas = document.getElementById("canvas");
+    const stage = document.getElementById("stage");
+    const canvasHeight = canvas
+        ? parseFloat(canvas.style.height || window.getComputedStyle(canvas).height || String(designHeight))
+        : designHeight;
+    const stretchedHeight = canvasHeight * TIMELINE_SCALE;
+
+    if (canvas !== null) {
+        canvas.style.height = `${stretchedHeight}px`;
+    }
+    if (stage !== null) {
+        stage.style.height = `calc(${stretchedHeight}px * var(--scale))`;
+    }
+
+    document.documentElement.dataset.timelineStretched = "true";
+}
+
 function renderArticle() {
     renderIntro();
     createMobileHeroLayer();
@@ -4476,8 +4970,10 @@ function renderArticle() {
     renderUncertainty();
     renderEffectivenessRange();
     buildSafetyScenes();
+    applyTimelineStretch();
     fillAllPlots();
     setupRevealObserver();
+    addTopProgressBar();
     addProgressRail();
     addScrollTopButton();
     applyResponsiveCardSizing();
@@ -4549,4 +5045,7 @@ window.addEventListener("load", function () {
     if (button !== null) {
         button.addEventListener("click", scrollToBurden);
     }
+
+    window.addEventListener("wheel", handleLandingFirstWheel, { passive: false });
+    window.addEventListener("wheel", handleDecisionIntroWheel, { passive: false });
 });
