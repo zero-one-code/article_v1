@@ -4435,7 +4435,7 @@ function buildPinnedPageLayer(def) {
         img.className = 'asset pinned-page-illustration';
         img.src = './assets/' + def.imageFile;
         img.alt = def.imageAlt || '';
-        setBox(img, 435, 118, 1050, 847);
+        setBox(img, 356, 54, 1208, 974);
         content.appendChild(img);
         def._bgSelector = '.pinned-page-illustration';
     } else if (def.kind === 'message') {
