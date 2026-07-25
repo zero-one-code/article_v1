@@ -3601,7 +3601,7 @@ function createMobileHeroLayer() {
     const layer = makeElement("div", "mobile-hero-layer");
     const content = makeElement("div", "mobile-hero-content");
     const title = makeElement("h1", "title main-title", "How Effective and Safe is the Herpes Zoster<br>Vaccine?");
-    setBox(title, 455, 319, 1010);
+    setBox(title, 455, 359, 1010);
     content.appendChild(title);
 
     const hint = makeElement("div", "mobile-scroll-hint", "<span class=\"scroll-guide\">Keep scrolling as you read to follow the story.</span><span class=\"scroll-label\">Scroll Down</span><span class=\"scroll-arrow\" aria-hidden=\"true\">↓</span>");
@@ -3822,7 +3822,7 @@ function handleDecisionIntroWheel(event) {
 
 function renderIntro() {
     const mainTitle = makeElement("h1", "title main-title landing-static-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
-    appendElement("intro", mainTitle, 455, 369, 1010);
+    appendElement("intro", mainTitle, 455, 359, 1010);
 
     addScrollButton("intro");
 
