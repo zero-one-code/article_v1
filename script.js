@@ -3600,7 +3600,7 @@ function createMobileHeroLayer() {
 
     const layer = makeElement("div", "mobile-hero-layer");
     const content = makeElement("div", "mobile-hero-content");
-    const title = makeElement("h1", "title main-title", "How Effective and Safe is<br>the Herpes Zoster<br>Vaccine?");
+    const title = makeElement("h1", "title main-title", "How Effective and Safe is the Herpes Zoster<br>Vaccine?");
     setBox(title, 455, 319, 1010);
     content.appendChild(title);
 
