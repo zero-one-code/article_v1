@@ -19,7 +19,7 @@
 }
 
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
 }
 
 body {
@@ -4852,9 +4852,16 @@ svg {
     animation: scrollPrompt 1.55s ease-in-out infinite;
 }
 
+html,
 body {
     overscroll-behavior-x: none;
-    overscroll-behavior-y: auto;
+    overscroll-behavior-y: none;
+}
+
+html,
+body,
+.page {
+    overflow-anchor: none;
 }
 
 button {
