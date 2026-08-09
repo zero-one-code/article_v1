@@ -1,6 +1,11 @@
 const designWidth = 1920;
 const designHeight = 72000;
 
+const ARTICLE_VARIANT = document.body.dataset.articleVariant === "v2" ? "v2" : "v1";
+const ARTICLE_FEATURES = Object.freeze({
+	showUncertainty: ARTICLE_VARIANT === "v1"
+});
+
 const MOBILE_LAYOUT_QUERY = "(max-width: 900px), (pointer: coarse) and (max-width: 1180px)";
 const DESKTOP_TIMELINE_SCALE = 1.28;
 const MOBILE_TIMELINE_SCALE = 5.00;
@@ -21,14 +26,24 @@ const dotSpacing = 20.95;
 const dotSpacingY = 20.88;
 const dotSize = 12;
 
-const sectionTops = {
-	intro: 0,
-	effectiveness: 10570,
-	uncertainty: 15720,
-	effectivenessRange: 22870,
-	safety: 30120,
-	closing: 42920
-};
+const SECTION_LAYOUTS = Object.freeze({
+	v1: {
+		intro: 0,
+		effectiveness: 10570,
+		uncertainty: 15720,
+		effectivenessRange: 22870,
+		safety: 30120,
+		closing: 42920
+	},
+	v2: {
+		intro: 0,
+		effectiveness: 10570,
+		safety: 19505,
+		closing: 36000
+	}
+});
+
+const sectionTops = { ...SECTION_LAYOUTS[ARTICLE_VARIANT] };
 
 const sections = {
 	intro: document.getElementById("section-intro"),
@@ -39,16 +54,8 @@ const sections = {
 	closing: document.getElementById("section-closing")
 };
 
-const sectionLabels = {
-	intro: "Intro",
-	effectiveness: "Effectiveness",
-	uncertainty: "Uncertainty",
-	effectivenessRange: "Uncertainty Range",
-	safety: "Safety",
-	closing: "Closing"
-};
-
-const navSections = [{
+const navSections = [
+	{
 		key: "disease",
 		label: "Disease burden",
 		getTop: () => getDiseaseNavigationTop()
@@ -58,11 +65,11 @@ const navSections = [{
 		label: "Effectiveness",
 		getTop: () => getSceneNavigationTop(".effectiveness-scrolly", 520)
 	},
-	{
+	...(ARTICLE_FEATURES.showUncertainty ? [{
 		key: "uncertainty",
 		label: "Uncertainty",
 		getTop: () => getSceneNavigationTop(".reliability-scrolly", 260)
-	},
+	}] : []),
 	{
 		key: "safety",
 		label: "Safety",
@@ -86,30 +93,34 @@ function getSceneNavigationTop(selector, visibleOffset) {
 }
 
 function getDiseaseNavigationTop() {
-	const visibleOffset = 40;
-	return getSceneNavigationTop(".disease-scrolly", visibleOffset);
+	return getSceneNavigationTop(".disease-scrolly", 40);
 }
 
 function getSafetyNavigationTop() {
-	const scene = document.querySelector('.effectiveness-range-scrolly');
-	if (scene === null) {
-		return SAFETY_PIN_BASE - 900;
+	if (ARTICLE_FEATURES.showUncertainty) {
+		const scene = document.querySelector(".effectiveness-range-scrolly");
+		if (scene !== null) {
+			const sceneTop = parseFloat(scene.dataset.absoluteTop || "0");
+			const pinOffset = parseFloat(scene.dataset.pinOffset || "0");
+			const buildDuration = 5000;
+			const safetyIntroOffset = 4790;
+			return Math.max(0, sceneTop - pinOffset + buildDuration + safetyIntroOffset);
+		}
 	}
 
-	const sceneTop = parseFloat(scene.dataset.absoluteTop || '0');
-	const pinOffset = parseFloat(scene.dataset.pinOffset || '0');
-	const buildDuration = 5000;
-	const safetyTitleOnlyOutroDistance = 4790;
-
-	return Math.max(
-		0,
-		sceneTop - pinOffset + buildDuration + safetyTitleOnlyOutroDistance
-	);
+	const safetyIntro = typeof PINNED_SCENE_DEFS !== "undefined" ?
+		PINNED_SCENE_DEFS.find((def) => def.id === "safety-intro") :
+		null;
+	if (safetyIntro && Number.isFinite(safetyIntro._top)) {
+		const fullyVisibleOffset = Math.max(900, (Number(safetyIntro.revealDist) || 1500) * 0.60);
+		return safetyIntro._top + fullyVisibleOffset;
+	}
+	return Number(sectionTops.safety) || PINNED_SCENE_BASE;
 }
 
 function getDecisionNavigationTop() {
-	const decisionDef = typeof SAFETY_SCENE_DEFS !== "undefined" ?
-		SAFETY_SCENE_DEFS.find((def) => def.id === "decision-intro") :
+	const decisionDef = typeof PINNED_SCENE_DEFS !== "undefined" ?
+		PINNED_SCENE_DEFS.find((def) => def.id === "decision-intro") :
 		null;
 	if (decisionDef && Number.isFinite(decisionDef._top)) {
 		return decisionDef._top + 920;
@@ -141,8 +152,19 @@ const scrollState = {
 	lastFrameTime: null
 };
 
+function getPageScrollTop() {
+	const values = [
+		window.scrollY,
+		window.pageYOffset,
+		document.documentElement ? document.documentElement.scrollTop : 0,
+		document.body ? document.body.scrollTop : 0
+	].filter((value) => Number.isFinite(value));
+
+	return Math.max(0, ...(values.length > 0 ? values : [0]));
+}
+
 function readDesignScrollY() {
-	return window.scrollY / (getScale() * getActiveTimelineScale());
+	return getPageScrollTop() / (getScale() * getActiveTimelineScale());
 }
 
 function designYToScrollTop(designY) {
@@ -194,9 +216,11 @@ function updateScrollDrivenScenes(currentDesignY) {
 	updateRiskScrolly(currentDesignY);
 	updateVaccinationScrolly(currentDesignY);
 	updateEffectivenessScrolly(currentDesignY);
-	updateReliabilityScrolly(currentDesignY);
-	updateUncertaintyConceptScrolly(currentDesignY);
-	updateEffectivenessRangeScrolly(currentDesignY);
+	if (ARTICLE_FEATURES.showUncertainty) {
+		updateReliabilityScrolly(currentDesignY);
+		updateUncertaintyConceptScrolly(currentDesignY);
+		updateEffectivenessRangeScrolly(currentDesignY);
+	}
 	updatePinnedPages(currentDesignY);
 	enforceSingleMobileSpeechCard();
 }
@@ -272,31 +296,10 @@ function getMobileBackgroundScale() {
 	return isMobileLayout() ? 1.10 : 1;
 }
 
-function getMatchedPinTop(pinOffset, staticY, pinnedY) {
-	const stageScale = getScale();
-	const pinScale = getPinScale();
-	return (pinOffset * stageScale * getActiveTimelineScale()) + (staticY * stageScale) - (pinnedY * pinScale);
-}
-
-function getMatchedPinTopForScale(pinOffset, staticY, pinnedY, targetScale) {
-	const stageScale = getScale();
-	return (pinOffset * stageScale * getActiveTimelineScale()) + (staticY * stageScale) - (pinnedY * targetScale);
-}
-
 function getMatchedStaticPinTop(pinOffset, staticY, pinnedY) {
 	const stageScale = getScale();
 	const pinScale = getPinScale();
 	return (pinOffset * stageScale * getActiveTimelineScale()) + (staticY * pinScale) - (pinnedY * pinScale);
-}
-
-function addReveal(element, variant) {
-	if (prefersReducedMotion) {
-		element.classList.add("is-visible");
-		return element;
-	}
-
-	element.classList.add(variant || "reveal");
-	return element;
 }
 
 function addStagger(element, index) {
@@ -309,9 +312,13 @@ function addStagger(element, index) {
 
 function updateScale() {
 	const viewport = window.visualViewport;
-	const viewportWidth = viewport ? viewport.width : window.innerWidth;
-	const viewportHeight = viewport ? viewport.height : window.innerHeight;
 	const compact = isMobileLayout();
+	const viewportWidth = compact && viewport ?
+		viewport.width :
+		(document.documentElement.clientWidth || window.innerWidth);
+	const viewportHeight = compact && viewport ?
+		viewport.height :
+		window.innerHeight;
 	const horizontalGutter = compact ? 12 : (viewportWidth < 1280 ? 20 : 32);
 	const verticalGutter = compact ? 10 : 20;
 	const availableWidth = Math.max(280, viewportWidth - (horizontalGutter * 2));
@@ -576,89 +583,12 @@ function makeElement(tagName, className, html) {
 	return element;
 }
 
-function addTitle(sectionName, html, className, left, top, width) {
-	const title = makeElement("h2", "title " + className, html);
-	addReveal(title, "reveal");
-	return appendElement(sectionName, title, left, top, width);
-}
-
-function addParagraph(sectionName, html, className, left, top, width) {
-	const paragraph = makeElement("p", className, html);
-	addReveal(paragraph, "reveal");
-	return appendElement(sectionName, paragraph, left, top, width);
-}
-
-function addCard(sectionName, html, top, extraClass) {
-	const card = makeElement("section", "text-card " + (extraClass || ""));
-	addReveal(card, "reveal-card");
-	const paragraph = makeElement("p", "", html);
-	card.appendChild(paragraph);
-	return appendElement(sectionName, card, 464, top, 993, 301);
-}
-
-function addSourceCard(sectionName, html, source, top) {
-	const card = makeElement("section", "text-card");
-	addReveal(card, "reveal-card");
-	card.style.flexDirection = "column";
-	card.appendChild(makeElement("p", "", html));
-	card.appendChild(makeElement("small", "", source));
-	return appendElement(sectionName, card, 464, top, 993, 301);
-}
-
-function addImage(sectionName, fileName, altText, left, top, width, height, className) {
-	const image = document.createElement("img");
-	image.className = "asset " + (className || "");
-	addReveal(image, "reveal-scale");
-	image.src = "./assets/" + fileName;
-	image.alt = altText;
-	return appendElement(sectionName, image, left, top, width, height);
-}
-
 function addScrollButton(sectionName) {
 	const button = makeElement("button", "scroll-button", "<span class=\"scroll-guide\">Keep scrolling as you read to follow the story.</span><span class=\"scroll-label\">Scroll Down</span><span class=\"scroll-arrow\" aria-hidden=\"true\">↓</span>");
 	button.type = "button";
 	button.id = "scrollButton";
 	button.setAttribute("aria-label", "Scroll to the disease burden section");
 	return appendElement(sectionName, button, 750, 856, 420);
-}
-
-function addIntroPlots() {
-	const wrapper = makeElement("div", "intro-plots reveal-card");
-	appendElement("intro", wrapper, 68, 5924, 1785, 650);
-
-	const placeboPlot = makeElement("div", "mini-dot-plot fade");
-	placeboPlot.dataset.dots = "1000";
-	placeboPlot.dataset.cols = "40";
-	placeboPlot.dataset.fill = "33";
-	placeboPlot.dataset.targetCount = "33";
-	placeboPlot.dataset.color = "red";
-	setBox(placeboPlot, 0, 0, 830, 515);
-	wrapper.appendChild(placeboPlot);
-
-	const vaccinePlot = makeElement("div", "mini-dot-plot fade");
-	vaccinePlot.dataset.dots = "1000";
-	vaccinePlot.dataset.cols = "40";
-	vaccinePlot.dataset.fill = "16";
-	vaccinePlot.dataset.targetCount = "16";
-	vaccinePlot.dataset.color = "red";
-	setBox(vaccinePlot, 955, 0, 830, 515);
-	wrapper.appendChild(vaccinePlot);
-
-	const placeboLabel = makeElement("p", "group-label intro-plot-label-primary", "placebo group");
-	setBox(placeboLabel, 155, 545, 520);
-	wrapper.appendChild(placeboLabel);
-
-	const placeboSubLabel = makeElement("p", "group-label intro-plot-label-secondary", "No vaccination");
-	setBox(placeboSubLabel, 155, 600, 520);
-	wrapper.appendChild(placeboSubLabel);
-
-	const vaccineLabel = makeElement("p", "group-label intro-plot-label-primary", "vaccinated group");
-	setBox(vaccineLabel, 1110, 545, 520);
-	wrapper.appendChild(vaccineLabel);
-
-	const vaccineSubLabel = makeElement("p", "group-label intro-plot-label-secondary", "Vaccination");
-	setBox(vaccineSubLabel, 1110, 600, 520);
-	wrapper.appendChild(vaccineSubLabel);
 }
 
 function makeDot(className, left, top) {
@@ -724,6 +654,7 @@ function fillPlot(plot) {
 		makeRangeBar(plot, rangeStart, rangeEnd, count, colour);
 	}
 
+	const fragment = document.createDocumentFragment();
 	for (let index = 0; index < total; index++) {
 		const column = index % columns;
 		const row = Math.floor(index / columns);
@@ -768,8 +699,9 @@ function fillPlot(plot) {
 			dot.style.opacity = Math.max(0.18, 1 - ((row - 15) * 0.13));
 		}
 
-		plot.appendChild(dot);
+		fragment.appendChild(dot);
 	}
+	plot.appendChild(fragment);
 }
 
 function fillAllPlots() {
@@ -833,104 +765,6 @@ function makeLegend(colour, label, hasRange) {
 	return legend;
 }
 
-function addChart(sectionName, options) {
-	const chartClassName = ['chart-section', 'reveal-card', options.className || ''].filter(Boolean).join(' ');
-	const chart = makeElement("section", chartClassName);
-	appendElement(sectionName, chart, 410, options.top, 1100, 760);
-
-	const heading = makeElement("h3", "", options.title);
-	chart.appendChild(heading);
-
-	const plot = makeDotPlot(options.count, options.colour, options.rangeStart, options.rangeEnd);
-	chart.appendChild(plot);
-
-	const mean = makeElement("p", "mean", options.mean);
-	if (options.hasRange) {
-		mean.dataset.rangeCountUp = "true";
-		mean.dataset.rangeStart = String(options.rangeStart || 0);
-		mean.dataset.rangeEnd = String(options.rangeEnd || 0);
-		mean.dataset.countUp = String(options.count);
-		mean.dataset.colour = options.colour;
-		mean.innerHTML = `<span class="${options.colour}">0~0</span> cases<br>(Mean: <span class="${options.colour}">0</span> cases)`;
-	} else {
-		mean.dataset.countUp = String(options.count);
-		mean.dataset.colour = options.colour;
-	}
-	chart.appendChild(mean);
-
-	const legend = makeLegend(options.colour, options.legend, options.hasRange);
-	chart.appendChild(legend);
-}
-
-function addCompare(sectionName, options) {
-	const compare = makeElement("section", "compare-section reveal-card");
-	appendElement(sectionName, compare, 0, options.top, 1920, 850);
-
-	const title = makeElement("h2", "title compare-title", options.title);
-	setBox(title, 425, 0, 1070);
-	compare.appendChild(title);
-
-	const leftLabel = makeElement("p", "compare-label", "<span class=\"blue\">Placebo group</span>");
-	setBox(leftLabel, 180, 150, 600);
-	compare.appendChild(leftLabel);
-
-	const rightLabel = makeElement("p", "compare-label", "<span class=\"blue\">Vaccinated group</span>");
-	setBox(rightLabel, 1140, 150, 600);
-	compare.appendChild(rightLabel);
-
-	const vsClass = options.colour === "purple" ? "purple-vs" : "red-vs";
-	const vs = makeElement("div", "vs " + vsClass, "VS");
-	setBox(vs, 906, 105, 108, 108);
-	compare.appendChild(vs);
-
-	const leftPlot = makeElement("div", "side-plot");
-	setBox(leftPlot, 65, 245, 830, 520);
-	leftPlot.appendChild(makeDotPlot(options.left.count, options.colour, options.left.rangeStart, options.left.rangeEnd));
-	const leftMean = makeElement("p", "mean", options.left.mean);
-	if (options.left.rangeStart === undefined) {
-		leftMean.dataset.countUp = String(options.left.count);
-		leftMean.dataset.colour = options.colour;
-	} else {
-		leftMean.dataset.rangeCountUp = "true";
-		leftMean.dataset.rangeStart = String(options.left.rangeStart || 0);
-		leftMean.dataset.rangeEnd = String(options.left.rangeEnd || 0);
-		leftMean.dataset.countUp = String(options.left.count);
-		leftMean.dataset.colour = options.colour;
-		leftMean.innerHTML = `<span class="${options.colour}">0~0</span> cases<br>(Mean: <span class="${options.colour}">0</span> cases)`;
-	}
-	leftPlot.appendChild(leftMean);
-	compare.appendChild(leftPlot);
-
-	const arrow = document.createElement("img");
-	arrow.className = "arrow-icon";
-	arrow.alt = options.arrowAlt;
-	arrow.src = "./assets/" + options.arrowFile;
-	setBox(arrow, 886, 352, 148, 148);
-	compare.appendChild(arrow);
-
-	const rightPlot = makeElement("div", "side-plot");
-	setBox(rightPlot, 1025, 245, 830, 520);
-	rightPlot.appendChild(makeDotPlot(options.right.count, options.colour, options.right.rangeStart, options.right.rangeEnd));
-	const rightMean = makeElement("p", "mean", options.right.mean);
-	if (options.right.rangeStart === undefined) {
-		rightMean.dataset.countUp = String(options.right.count);
-		rightMean.dataset.colour = options.colour;
-	} else {
-		rightMean.dataset.rangeCountUp = "true";
-		rightMean.dataset.rangeStart = String(options.right.rangeStart || 0);
-		rightMean.dataset.rangeEnd = String(options.right.rangeEnd || 0);
-		rightMean.dataset.countUp = String(options.right.count);
-		rightMean.dataset.colour = options.colour;
-		rightMean.innerHTML = `<span class="${options.colour}">0~0</span> cases<br>(Mean: <span class="${options.colour}">0</span> cases)`;
-	}
-	rightPlot.appendChild(rightMean);
-	compare.appendChild(rightPlot);
-
-	const legend = makeLegend(options.colour, options.legend, true);
-	compare.appendChild(legend);
-}
-
-
 function clamp(value, min, max) {
 	return Math.min(Math.max(value, min), max);
 }
@@ -953,45 +787,26 @@ const SPEECH_SCROLL_DISTANCE = 1595;
 const MOTION = {
 	speechStartY: 1080,
 	speechEndY: -520,
-	speechFadeInStart: 0.025,
-	speechFadeInEnd: 0.13,
+	speechFadeInStart: 0.015,
+	speechFadeInEnd: 0.10,
 	speechFadeOutStart: 0.885,
 	speechFadeOutEnd: 0.985,
 	mobileSpeechStartY: 1180,
 	mobileSpeechEndY: -980,
 	mobileSpeechEntryViewportPadding: 28,
 	mobileSpeechExitViewportPadding: 24,
-	mobileSpeechFadeInStart: 0.025,
-	mobileSpeechFadeInEnd: 0.15,
+	mobileSpeechFadeInStart: 0.015,
+	mobileSpeechFadeInEnd: 0.12,
 	mobileSpeechFadeOutStart: 0.865,
 	mobileSpeechFadeOutEnd: 0.985,
-	scrollCatchupLarge: 0.72,
-	scrollCatchupMedium: 0.52,
-	scrollCatchupSmall: 0.30,
-	scrollCatchupFine: 0.18
+	scrollCatchupLarge: 0.42,
+	scrollCatchupMedium: 0.34,
+	scrollCatchupSmall: 0.26,
+	scrollCatchupFine: 0.20
 };
 
-function easeScrollMotion(value) {
-	const t = clamp(value, 0, 1);
-	return t * t * (3 - (2 * t));
-}
-
 function getSpeechTravelProgress(progress) {
-	const t = clamp(progress, 0, 1);
-
-	if (t <= 0.07) {
-		return lerp(0, 0.13, smoothStep(0, 0.07, t));
-	}
-
-	if (t <= 0.93) {
-		return lerp(0.13, 0.87, smoothStep(0.07, 0.93, t));
-	}
-
-	return lerp(0.87, 1, smoothStep(0.93, 1, t));
-}
-
-function getSpeechProgress(scrollDistance, startDistance) {
-	return clamp((scrollDistance - startDistance) / SPEECH_SCROLL_DISTANCE, 0, 1);
+	return clamp(progress, 0, 1);
 }
 
 function getMinimumMobileCardDistance() {
@@ -1006,7 +821,7 @@ function getMinimumMobileCardDistance() {
 	return physicalDistance / designToPhysical;
 }
 
-function getMobileSequenceProgress(scrollDistance, index, count, sequenceEnd, options) {
+function getMobileSequenceTiming(index, count, sequenceEnd, options) {
 	const settings = options || {};
 	const startPadding = Number.isFinite(settings.startPadding) ? settings.startPadding : 0;
 	const gap = Number.isFinite(settings.gap) ? settings.gap : 90;
@@ -1020,11 +835,11 @@ function getMobileSequenceProgress(scrollDistance, index, count, sequenceEnd, op
 		Math.max(calculatedCardDistance, getMinimumMobileCardDistance()) :
 		calculatedCardDistance;
 	const startDistance = startPadding + (index * (cardDistance + gap));
+	return { cardDistance, startDistance };
 
-	return clamp((scrollDistance - startDistance) / cardDistance, 0, 1);
 }
 
-function getVariableSequenceProgress(scrollDistance, index, durations, startPadding, gap) {
+function getVariableSequenceTiming(index, durations, startPadding, gap) {
 	const safeDurations = Array.isArray(durations) && durations.length > 0 ?
 		durations.map((duration) => Math.max(1, Number(duration) || 1)) :
 		[1];
@@ -1035,12 +850,10 @@ function getVariableSequenceProgress(scrollDistance, index, durations, startPadd
 	for (let cursor = 0; cursor < safeIndex; cursor += 1) {
 		startDistance += safeDurations[cursor] + safeGap;
 	}
-
-	return clamp(
-		(scrollDistance - startDistance) / safeDurations[safeIndex],
-		0,
-		1
-	);
+	return {
+		cardDistance: safeDurations[safeIndex],
+		startDistance
+	};
 }
 
 function getMobileSpeechGeometry(card) {
@@ -1061,11 +874,42 @@ function getMobileSpeechGeometry(card) {
 	};
 }
 
+function getReferenceScrollItemDuration(card) {
+	const geometry = getMobileSpeechGeometry(card);
+	const viewport = window.visualViewport;
+	const viewportHeight = viewport ? viewport.height : window.innerHeight;
+	const cardHeight = geometry === null ? 0 : geometry.cardHeight;
+	const physicalScrollPerDesignUnit = Math.max(
+		0.01,
+		getScale() * getActiveTimelineScale()
+	);
+
+	return Math.max(1, (viewportHeight + cardHeight) / physicalScrollPerDesignUnit);
+}
+
+function getReferenceScrollItemProgress(card, scrollDistance, startDistance) {
+	return clamp(
+		(scrollDistance - startDistance) / getReferenceScrollItemDuration(card),
+		0,
+		1
+	);
+}
+
+function getReferenceSequenceProgress(card, scrollDistance, index, count, sequenceEnd, options) {
+	const timing = getMobileSequenceTiming(index, count, sequenceEnd, options);
+	return getReferenceScrollItemProgress(card, scrollDistance, timing.startDistance);
+}
+
+function getReferenceVariableSequenceProgress(card, scrollDistance, index, durations, startPadding, gap) {
+	const timing = getVariableSequenceTiming(index, durations, startPadding, gap);
+	return getReferenceScrollItemProgress(card, scrollDistance, timing.startDistance);
+}
+
 function resolveMobileSpeechStartY(card) {
 	const geometry = getMobileSpeechGeometry(card);
 	if (geometry === null) return MOTION.mobileSpeechStartY;
 
-	const targetTop = window.innerHeight + MOTION.mobileSpeechEntryViewportPadding;
+	const targetTop = window.innerHeight;
 	const resolved = (targetTop - geometry.cardBaseTop) / geometry.parentScale;
 	return Number.isFinite(resolved) ? resolved : MOTION.mobileSpeechStartY;
 }
@@ -1074,11 +918,10 @@ function resolveMobileSpeechEndY(card) {
 	const geometry = getMobileSpeechGeometry(card);
 	if (geometry === null) return MOTION.mobileSpeechEndY;
 
-	const targetTop = -(geometry.cardHeight + MOTION.mobileSpeechExitViewportPadding);
+	const targetTop = -geometry.cardHeight;
 	const resolved = (targetTop - geometry.cardBaseTop) / geometry.parentScale;
 	return Number.isFinite(resolved) ? resolved : MOTION.mobileSpeechEndY;
 }
-
 
 function setHybridSpeechCardMotion(card, progress) {
 	if (card === null) return;
@@ -1165,7 +1008,6 @@ function enforceSingleMobileSpeechCard() {
 function makeDiseaseCard(html, className) {
 	const card = makeElement("section", "text-card disease-card " + className);
 	card.appendChild(makeElement("p", "", html));
-	card.setAttribute("aria-hidden", "true");
 	return card;
 }
 
@@ -1310,6 +1152,7 @@ function updateDiseaseScrolly(currentDesignY) {
 	}
 
 	const scrollDist = currentDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 
 	const diseaseSequenceEnd = pinDuration * transitionOutStart;
 	const diseaseSequenceConfig = isMobileLayout() ?
@@ -1325,8 +1168,9 @@ function updateDiseaseScrolly(currentDesignY) {
 	if (firstCard !== null) {
 		setHybridSpeechCardMotion(
 			firstCard,
-			getMobileSequenceProgress(
-				scrollDist,
+			getReferenceSequenceProgress(
+				firstCard,
+				speechScrollDist,
 				0,
 				2,
 				diseaseSequenceEnd,
@@ -1337,8 +1181,9 @@ function updateDiseaseScrolly(currentDesignY) {
 	if (secondCard !== null) {
 		setHybridSpeechCardMotion(
 			secondCard,
-			getMobileSequenceProgress(
-				scrollDist,
+			getReferenceSequenceProgress(
+				secondCard,
+				speechScrollDist,
 				1,
 				2,
 				diseaseSequenceEnd,
@@ -1348,11 +1193,9 @@ function updateDiseaseScrolly(currentDesignY) {
 	}
 }
 
-
 function makeRiskCard(html, className) {
 	const card = makeElement("section", "text-card risk-card " + className);
 	card.appendChild(makeElement("p", "", html));
-	card.setAttribute("aria-hidden", "true");
 	return card;
 }
 
@@ -1508,6 +1351,7 @@ function updateRiskScrolly(currentDesignY) {
 	}
 
 	const scrollDist = currentDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 
 	const riskSequenceEnd = pinDuration * sceneExitStart;
 	const riskVisualReadyDistance = Math.max(0, riskVisualReadyY - pinStart);
@@ -1522,8 +1366,9 @@ function updateRiskScrolly(currentDesignY) {
 	if (firstCard !== null) {
 		setHybridSpeechCardMotion(
 			firstCard,
-			getMobileSequenceProgress(
-				scrollDist,
+			getReferenceSequenceProgress(
+				firstCard,
+				speechScrollDist,
 				0,
 				2,
 				riskSequenceEnd,
@@ -1534,8 +1379,9 @@ function updateRiskScrolly(currentDesignY) {
 	if (secondCard !== null) {
 		setHybridSpeechCardMotion(
 			secondCard,
-			getMobileSequenceProgress(
-				scrollDist,
+			getReferenceSequenceProgress(
+				secondCard,
+				speechScrollDist,
 				1,
 				2,
 				riskSequenceEnd,
@@ -1544,7 +1390,6 @@ function updateRiskScrolly(currentDesignY) {
 		);
 	}
 }
-
 
 
 function makeIntroPlotsElement(className) {
@@ -1602,7 +1447,6 @@ function makeVaccineCard(html, className, source) {
 		card.appendChild(makeElement("small", "", source));
 	}
 
-	card.setAttribute("aria-hidden", "true");
 	return card;
 }
 
@@ -1753,6 +1597,7 @@ function updateVaccinationScrolly(currentDesignY) {
 	}
 
 	const scrollDist = currentDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 
 	const vaccineSequenceEnd = pinDuration - vaccineHandoffDuration;
 	const mobileVaccineSequenceConfig = {
@@ -1777,10 +1622,11 @@ function updateVaccinationScrolly(currentDesignY) {
 		desktopOtherDistance
 	];
 
-	const getVaccineCardProgress = (index) => {
+	const getVaccineCardProgress = (card, index) => {
 		if (isMobileLayout()) {
-			return getMobileSequenceProgress(
-				scrollDist,
+			return getReferenceSequenceProgress(
+				card,
+				speechScrollDist,
 				index,
 				3,
 				vaccineSequenceEnd,
@@ -1788,8 +1634,9 @@ function updateVaccinationScrolly(currentDesignY) {
 			);
 		}
 
-		return getVariableSequenceProgress(
-			scrollDist,
+		return getReferenceVariableSequenceProgress(
+			card,
+			speechScrollDist,
 			index,
 			desktopVaccineDurations,
 			desktopVaccineStartPadding,
@@ -1800,23 +1647,22 @@ function updateVaccinationScrolly(currentDesignY) {
 	if (sourceCard !== null) {
 		setVaccineCardScrollPosition(
 			sourceCard,
-			getVaccineCardProgress(0)
+			getVaccineCardProgress(sourceCard, 0)
 		);
 	}
 	if (comparisonCard !== null) {
 		setVaccineCardScrollPosition(
 			comparisonCard,
-			getVaccineCardProgress(1)
+			getVaccineCardProgress(comparisonCard, 1)
 		);
 	}
 	if (comparisonDetailCard !== null) {
 		setVaccineCardScrollPosition(
 			comparisonDetailCard,
-			getVaccineCardProgress(2)
+			getVaccineCardProgress(comparisonDetailCard, 2)
 		);
 	}
 }
-
 
 function makeEffectivenessQuestionBlock() {
 	const block = makeElement("div", "effectiveness-question-block");
@@ -1854,86 +1700,7 @@ function makeEffectivenessPinnedChart(options) {
 function makeEffectivenessPinnedCard(html, className) {
 	const card = makeElement("section", "text-card effectiveness-pinned-card " + (className || ""));
 	card.appendChild(makeElement("p", "", html));
-	card.setAttribute("aria-hidden", "true");
 	return card;
-}
-
-function makeEffectivenessPinnedCompare() {
-	const compare = makeElement("section", "compare-section effectiveness-pinned-compare is-visible");
-
-	const title = makeElement("h2", "title compare-title", "The Effectiveness of Vaccination");
-	setBox(title, 425, 0, 1070);
-	compare.appendChild(title);
-
-	const leftLabel = makeElement("p", "compare-label", "<span class=\"blue\">Placebo group</span>");
-	setBox(leftLabel, 180, 150, 600);
-	compare.appendChild(leftLabel);
-
-	const rightLabel = makeElement("p", "compare-label", "<span class=\"blue\">Vaccinated group</span>");
-	setBox(rightLabel, 1140, 150, 600);
-	compare.appendChild(rightLabel);
-
-	const vs = makeElement("div", "vs red-vs", "VS");
-	setBox(vs, 906, 105, 108, 108);
-	compare.appendChild(vs);
-
-	const leftPlot = makeElement("div", "side-plot effectiveness-compare-left");
-	setBox(leftPlot, 65, 245, 830, 520);
-	leftPlot.appendChild(makeDotPlot(33, "red"));
-	const leftMean = makeElement("p", "mean", "Mean: <span class=\"red\">33</span> cases");
-	leftMean.dataset.countUp = "33";
-	leftMean.dataset.colour = "red";
-	leftPlot.appendChild(leftMean);
-	compare.appendChild(leftPlot);
-
-	const arrow = document.createElement("img");
-	arrow.className = "arrow-icon";
-	arrow.alt = "A down arrow showing reduction after vaccination";
-	arrow.src = "./assets/arrow1.png";
-	setBox(arrow, 886, 352, 148, 148);
-	compare.appendChild(arrow);
-
-	const rightPlot = makeElement("div", "side-plot effectiveness-compare-right");
-	setBox(rightPlot, 1025, 245, 830, 520);
-	rightPlot.appendChild(makeDotPlot(16, "red"));
-	const rightMean = makeElement("p", "mean", "Mean: <span class=\"red\">16</span> cases");
-	rightMean.dataset.countUp = "16";
-	rightMean.dataset.colour = "red";
-	rightPlot.appendChild(rightMean);
-	compare.appendChild(rightPlot);
-
-	const legend = makeLegend("red", "Case of herpes zoster", true);
-	compare.appendChild(legend);
-
-	return compare;
-}
-
-
-function makeEffectivenessSummaryCard() {
-	const card = makeElement("section", "text-card effectiveness-pinned-card effectiveness-summary-card");
-	card.appendChild(makeElement("p", "", "For every 1000 people, vaccination reduced<br>an average of <span class=\"red\">17</span> herpes zoster cases<br>compared to the placebo group."));
-	card.setAttribute("aria-hidden", "true");
-	return card;
-}
-
-function setEffectivenessSummaryCardState(card, progress) {
-	if (card === null) {
-		return;
-	}
-
-	const holdY = 430;
-	const enterProgress = smoothStep(0.948, 0.968, progress);
-	const exitProgress = smoothStep(0.968, 0.996, progress);
-	const y = exitProgress > 0 ?
-		lerp(holdY, -420, exitProgress) :
-		lerp(1080, holdY, enterProgress);
-	const fadeIn = smoothStep(0.948, 0.960, progress);
-	const fadeOut = 1 - smoothStep(0.990, 0.996, progress);
-	const opacity = Math.min(fadeIn, fadeOut);
-
-	card.style.opacity = opacity.toFixed(3);
-	card.style.visibility = opacity > 0.02 ? "visible" : "hidden";
-	card.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
 }
 
 function createEffectivenessPinLayer() {
@@ -1971,7 +1738,6 @@ function createEffectivenessPinLayer() {
 		"effectiveness-placebo-card"
 	);
 	content.appendChild(placeboCard);
-
 
 	const vaccinatedCard = makeEffectivenessPinnedCard(
 		"<span class=\"grey\">It was estimated that</span> about <span class=\"red\">16</span> out of every 1000 people who receive the vaccine<span class=\"grey\"> developed herpes zoster.</span>",
@@ -2108,7 +1874,6 @@ function updateEffectivenessChartContent(chart, mode) {
 		});
 	}
 }
-
 
 function easeInOutCubic(value) {
 	const t = clamp(value, 0, 1);
@@ -2402,152 +2167,6 @@ function setScrollTiedRangeCount(meanElement, rangeStart, rangeEnd, targetMean, 
 	}
 }
 
-function applyDotSplitFromSourceGrid(plot, progress, source, options) {
-	if (plot === null || source === null) {
-		return;
-	}
-
-	const dots = plot.querySelectorAll(".dot");
-	const eased = smoothStep(0, 1, progress);
-	const arc = Math.sin(eased * Math.PI);
-	const curveStrength = options && options.curve !== undefined ? options.curve : 46;
-	const opacityBase = options && options.opacityBase !== undefined ? options.opacityBase : 1;
-	const sourceMode = options && options.sourceMode ? options.sourceMode : "cluster";
-	const targetOriginX = source.targetOriginX;
-	const targetOriginY = source.targetOriginY;
-	const clusterCenterX = source.centerX !== undefined ? source.centerX : source.originX + 415;
-	const clusterCenterY = source.centerY !== undefined ? source.centerY : source.originY + 258;
-	const clusterRadius = options && options.radius !== undefined ? options.radius : 58;
-	const sideBias = options && options.sideBias !== undefined ? options.sideBias : 0;
-
-	plot.classList.add("dot-morphing", "plot-animated");
-	plot.style.setProperty("--morph-progress", eased.toFixed(3));
-
-	dots.forEach((dot, index) => {
-		const targetX = parseFloat(dot.style.left || "0");
-		const targetY = parseFloat(dot.style.top || "0");
-		const targetGlobalX = targetOriginX + targetX;
-		const targetGlobalY = targetOriginY + targetY;
-
-		let sourceX;
-		let sourceY;
-
-		if (sourceMode === "grid") {
-			const sourceColumn = index % 40;
-			const sourceRow = Math.floor(index / 40);
-			sourceX = source.originX + (sourceColumn * dotSpacing);
-			sourceY = source.originY + (sourceRow * dotSpacingY);
-		} else {
-			const angle = (index * 2.3999632297) + (sideBias * 0.34);
-			const ring = Math.sqrt((index % 1000) / 999);
-			const swirl = Math.sin((index % 29) * 0.52) * 4;
-			sourceX = clusterCenterX + Math.cos(angle) * (clusterRadius * ring + swirl);
-			sourceY = clusterCenterY + Math.sin(angle) * (clusterRadius * ring + swirl);
-		}
-
-		const dx = targetGlobalX - sourceX;
-		const dy = targetGlobalY - sourceY;
-		const length = Math.max(1, Math.sqrt((dx * dx) + (dy * dy)));
-		const px = -dy / length;
-		const py = dx / length;
-		const stagger = ((index % 37) / 36) * 0.065;
-		const local = smoothStep(0, 1, clamp((progress - stagger) / 0.92, 0, 1));
-		const localArc = Math.sin(local * Math.PI);
-		const sideDirection = dx < 0 ? -1 : 1;
-		const travelRatio = Math.min(1, length / 900);
-		const curve = localArc * curveStrength * sideDirection * (0.45 + (0.55 * travelRatio));
-		const drift = localArc * 18 * Math.sin(index * 0.41 + sideBias);
-		const currentX = sourceX + (dx * local) + (px * curve) + (py * drift * 0.35);
-		const currentY = sourceY + (dy * local) + (py * curve) - (px * drift * 0.35);
-		const transformX = currentX - targetGlobalX;
-		const transformY = currentY - targetGlobalY;
-		const scale = lerp(0.45, 1, local);
-		const reveal = smoothStep(0.04, 0.40, local);
-
-		dot.style.transform = `translate3d(${transformX.toFixed(2)}px, ${transformY.toFixed(2)}px, 0) scale(${scale.toFixed(3)})`;
-		dot.style.opacity = (opacityBase * reveal).toFixed(3);
-	});
-}
-
-function setMorphingChartState(chart, expandStart, gridEnd, collapseStart, collapseEnd, fadeEnd, progress) {
-	if (chart === null) {
-		return;
-	}
-
-	const reveal = smoothStep(expandStart, gridEnd, progress);
-	const collapse = smoothStep(collapseStart, collapseEnd, progress);
-	const fadeOut = 1 - smoothStep(collapseEnd, fadeEnd, progress);
-	const opacity = Math.min(smoothStep(expandStart - 0.02, expandStart + 0.03, progress), fadeOut);
-	const morphProgress = collapseStart >= 1 ? reveal : Math.min(reveal, 1 - collapse);
-	const plot = chart.querySelector(".dot-plot");
-
-	chart.style.opacity = opacity.toFixed(3);
-	chart.style.transform = `translate3d(0, ${Math.round(lerp(34, 0, reveal))}px, 0) scale(${getMobileBackgroundScale().toFixed(4)})`;
-
-	if (opacity > 0.01) {
-		applyDotMorph(plot, morphProgress);
-	} else {
-		resetDotMorph(plot);
-	}
-
-	if (reveal > 0.35) {
-		chart.querySelectorAll(".mean[data-count-up]").forEach(runCountUp);
-	}
-}
-
-function setMorphingCompareState(compare, expandStart, gridEnd, fadeStart, fadeEnd, progress) {
-	if (compare === null) {
-		return;
-	}
-
-	const splitProgress = smoothStep(expandStart, gridEnd, progress);
-	const fade = 1 - smoothStep(fadeStart, fadeEnd, progress);
-	const opacity = Math.min(smoothStep(expandStart - 0.015, expandStart + 0.035, progress), fade);
-	const detailOpacity = smoothStep(0.58, 0.88, splitProgress) * opacity;
-
-	compare.style.opacity = opacity.toFixed(3);
-	compare.style.visibility = opacity > 0.02 ? "visible" : "hidden";
-	compare.style.transform = `translate3d(0, 0, 0) scale(${getMobileBackgroundScale().toFixed(4)})`;
-
-	const compareLeft = parseFloat(compare.style.left || "0");
-	const compareTop = parseFloat(compare.style.top || "0");
-	const sourceOriginX = 410 + 141;
-	const sourceOriginY = 150 + 148;
-	const sourceCenterX = sourceOriginX + 415;
-	const sourceCenterY = sourceOriginY + 258;
-
-	compare.querySelectorAll(".side-plot").forEach((sidePlot) => {
-		const plot = sidePlot.querySelector(".dot-plot");
-		const mean = sidePlot.querySelector(".mean");
-
-		if (plot === null) {
-			return;
-		}
-
-		const sideLeft = parseFloat(sidePlot.style.left || "0");
-		const sideTop = parseFloat(sidePlot.style.top || "0");
-		const targetOriginX = compareLeft + sideLeft;
-		const targetOriginY = compareTop + sideTop;
-
-		plot.style.opacity = "0";
-		resetDotMorph(plot);
-
-		if (mean !== null) {
-			mean.style.opacity = detailOpacity.toFixed(3);
-			mean.style.transform = detailOpacity > 0.01 ? "translate3d(0, 0, 0)" : "translate3d(0, 10px, 0)";
-		}
-	});
-
-	compare.querySelectorAll(".compare-label, .vs, .arrow-icon, .legend").forEach((element) => {
-		element.style.opacity = detailOpacity.toFixed(3);
-		element.style.transform = detailOpacity > 0.01 ? "translate3d(0, 0, 0) scale(1)" : "translate3d(0, 10px, 0) scale(0.94)";
-	});
-
-	if (splitProgress > 0.92 && detailOpacity > 0.5) {
-		compare.querySelectorAll(".mean[data-count-up]").forEach(runCountUp);
-	}
-}
-
 function updateEffectivenessScrolly(currentDesignY) {
 	const scene = document.querySelector(".effectiveness-scrolly");
 	const pinLayer = document.querySelector(".effectiveness-pin-layer");
@@ -2578,22 +2197,19 @@ function updateEffectivenessScrolly(currentDesignY) {
 	const summaryCard = pinLayer.querySelector(".effectiveness-summary-card");
 
 	const scrollDist = currentDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 	const CARD_PASS = SPEECH_SCROLL_DISTANCE;
 	const F1 = 2600;
 	const F2 = 4100;
 	let chartScroll;
-	let placeboCardP = 0;
-	let vaccCardP = 0;
 	if (scrollDist < F1) {
 		chartScroll = scrollDist;
 	} else if (scrollDist < F1 + CARD_PASS) {
 		chartScroll = F1;
-		placeboCardP = (scrollDist - F1) / CARD_PASS;
 	} else if (scrollDist < (F1 + CARD_PASS) + (F2 - F1)) {
 		chartScroll = F1 + (scrollDist - (F1 + CARD_PASS));
 	} else if (scrollDist < (F1 + CARD_PASS) + (F2 - F1) + CARD_PASS) {
 		chartScroll = F2;
-		vaccCardP = (scrollDist - ((F1 + CARD_PASS) + (F2 - F1))) / CARD_PASS;
 	} else {
 		chartScroll = F2 + (scrollDist - ((F1 + CARD_PASS) + (F2 - F1) + CARD_PASS));
 	}
@@ -2629,19 +2245,24 @@ function updateEffectivenessScrolly(currentDesignY) {
 	renderEffectivenessCanvas(heldContentProgress);
 
 	if (placeboCard !== null) {
-		setVaccineCardScrollPosition(placeboCard, clamp(placeboCardP, 0, 1));
+		setVaccineCardScrollPosition(
+			placeboCard,
+			getReferenceScrollItemProgress(placeboCard, speechScrollDist, F1)
+		);
 	}
 
 	if (vaccinatedCard !== null) {
-		setVaccineCardScrollPosition(vaccinatedCard, clamp(vaccCardP, 0, 1));
+		const vaccinatedCardStart = (F1 + CARD_PASS) + (F2 - F1);
+		setVaccineCardScrollPosition(
+			vaccinatedCard,
+			getReferenceScrollItemProgress(vaccinatedCard, speechScrollDist, vaccinatedCardStart)
+		);
 	}
 }
-
 
 function makeReliabilityCard() {
 	const card = makeElement("section", "text-card reliability-card");
 	card.appendChild(makeElement("p", "", "A single estimate is useful,<br>but it is not the whole answer."));
-	card.setAttribute("aria-hidden", "true");
 	return card;
 }
 
@@ -3148,7 +2769,6 @@ function updateUncertaintyConceptScrolly(currentDesignY) {
 	});
 }
 
-
 function makeEffectivenessRangePinnedChart(config) {
 	const title = config && config.title ?
 		config.title :
@@ -3207,10 +2827,8 @@ function makeEffectivenessRangePinnedCard(html, extraClass) {
 	const className = extraClass ? `text-card effectiveness-range-pinned-card ${extraClass}` : 'text-card effectiveness-range-pinned-card';
 	const card = makeElement('section', className);
 	card.appendChild(makeElement('p', '', html));
-	card.setAttribute('aria-hidden', 'true');
 	return card;
 }
-
 
 function makeEffectivenessRangePinnedCompare() {
 	const compare = makeElement('section', 'compare-section effectiveness-range-pinned-compare');
@@ -3307,14 +2925,14 @@ function createEffectivenessRangePinLayer() {
 	content.appendChild(vaccinatedChart);
 
 	const placeboCard = makeEffectivenessRangePinnedCard(
-		'<span class=\"grey\">The number of people who get herpes zoster in the placebo group is likely</span> between <span class="red">30</span> and <span class="red">36</span> people in every 1000 people.',
+		'<span class=\"grey\">The number of people who get herpes zoster in the placebo group is likely</span> between <span class="red">30</span> and <span class="red">36</span> people in every 1,000 people.',
 		'effectiveness-range-pinned-card--placebo'
 	);
 	setBox(placeboCard, 464, 0, 993, 301);
 	content.appendChild(placeboCard);
 
 	const vaccinatedCard = makeEffectivenessRangePinnedCard(
-		'<span class=\"grey\">The number of people who get herpes zoster in the vaccinated group is likely</span> between <span class="red">14</span> and <span class="red">19</span> people in every 1000 people.',
+		'<span class=\"grey\">The number of people who get herpes zoster in the vaccinated group is likely</span> between <span class="red">14</span> and <span class="red">19</span> people in every 1,000 people.',
 		'effectiveness-range-pinned-card--vaccinated'
 	);
 	setBox(vaccinatedCard, 464, 0, 993, 301);
@@ -3397,6 +3015,7 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 	const preRevealEnd = pinStart - 80;
 	const buildDuration = 5000;
 	const scrollDist = progressDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 	const overallProgress = clamp(scrollDist / pinDuration, 0, 1);
 	const progress = clamp(scrollDist / buildDuration, 0, 1);
 	const outroDuration = Math.max(1, pinDuration - buildDuration);
@@ -3523,7 +3142,6 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 		});
 	};
 
-
 	const setPinnedCompareState = (compare, options) => {
 		if (compare === null) {
 			return;
@@ -3628,11 +3246,17 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 	});
 
 	if (placeboCard !== null) {
-		setVaccineCardScrollPosition(placeboCard, getSpeechProgress(scrollDist, 1600));
+		setVaccineCardScrollPosition(
+			placeboCard,
+			getReferenceScrollItemProgress(placeboCard, speechScrollDist, 1600)
+		);
 	}
 
 	if (vaccinatedCard !== null) {
-		setVaccineCardScrollPosition(vaccinatedCard, getSpeechProgress(scrollDist, 3300));
+		setVaccineCardScrollPosition(
+			vaccinatedCard,
+			getReferenceScrollItemProgress(vaccinatedCard, speechScrollDist, 3300)
+		);
 	}
 
 	setPinnedCompareState(rangeCompare, {
@@ -3651,6 +3275,7 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 	});
 
 	const outroDist = scrollDist - buildDuration;
+	const speechOutroDist = speechScrollDist - buildDuration;
 	const compareFade = 1 - smoothStep(4495, 4795, outroDist);
 	if (rangeCompare !== null && scrollDist >= buildDuration) {
 		const compareContainerOpacity = layerOpacity * compareFade;
@@ -3658,38 +3283,37 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 		rangeCompare.style.visibility = compareContainerOpacity > 0.02 ? 'visible' : 'hidden';
 	}
 
-
 	if (isMobileLayout()) {
 		const mobileCompareSequenceEnd = 4495;
 		if (compareLowerCard !== null) {
-			setVaccineCardScrollPosition(compareLowerCard, getMobileSequenceProgress(outroDist, 0, 3, mobileCompareSequenceEnd, {
+			setVaccineCardScrollPosition(compareLowerCard, getReferenceSequenceProgress(compareLowerCard, speechOutroDist, 0, 3, mobileCompareSequenceEnd, {
 				gap: 90
 			}));
 			compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 		if (compareMeanDifferenceCard !== null) {
-			setVaccineCardScrollPosition(compareMeanDifferenceCard, getMobileSequenceProgress(outroDist, 1, 3, mobileCompareSequenceEnd, {
+			setVaccineCardScrollPosition(compareMeanDifferenceCard, getReferenceSequenceProgress(compareMeanDifferenceCard, speechOutroDist, 1, 3, mobileCompareSequenceEnd, {
 				gap: 90
 			}));
 			compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 		if (compareOverallCard !== null) {
-			setVaccineCardScrollPosition(compareOverallCard, getMobileSequenceProgress(outroDist, 2, 3, mobileCompareSequenceEnd, {
+			setVaccineCardScrollPosition(compareOverallCard, getReferenceSequenceProgress(compareOverallCard, speechOutroDist, 2, 3, mobileCompareSequenceEnd, {
 				gap: 90
 			}));
 			compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 	} else {
 		if (compareLowerCard !== null) {
-			setVaccineCardScrollPosition(compareLowerCard, getSpeechProgress(outroDist, 0));
+			setVaccineCardScrollPosition(compareLowerCard, getReferenceScrollItemProgress(compareLowerCard, speechOutroDist, 0));
 			compareLowerCard.style.opacity = (parseFloat(compareLowerCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 		if (compareMeanDifferenceCard !== null) {
-			setVaccineCardScrollPosition(compareMeanDifferenceCard, getSpeechProgress(outroDist, 1450));
+			setVaccineCardScrollPosition(compareMeanDifferenceCard, getReferenceScrollItemProgress(compareMeanDifferenceCard, speechOutroDist, 1450));
 			compareMeanDifferenceCard.style.opacity = (parseFloat(compareMeanDifferenceCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 		if (compareOverallCard !== null) {
-			setVaccineCardScrollPosition(compareOverallCard, getSpeechProgress(outroDist, 2900));
+			setVaccineCardScrollPosition(compareOverallCard, getReferenceScrollItemProgress(compareOverallCard, speechOutroDist, 2900));
 			compareOverallCard.style.opacity = (parseFloat(compareOverallCard.style.opacity || '0') * layerOpacity).toFixed(3);
 		}
 	}
@@ -3705,7 +3329,7 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 	}
 
 	if (safetyInfoCard !== null) {
-		setOpaqueSpeechCardScrollPosition(safetyInfoCard, getSpeechProgress(outroDist, 4800));
+		setOpaqueSpeechCardScrollPosition(safetyInfoCard, getReferenceScrollItemProgress(safetyInfoCard, speechOutroDist, 4800));
 	}
 
 	if (safetyFirstChart !== null) {
@@ -3716,7 +3340,6 @@ function updateEffectivenessRangeScrolly(currentDesignY) {
 		safetyFirstChart.style.transform = `translate3d(0, ${lerp(26, 0, chartReveal).toFixed(2)}px, 0)`;
 	}
 }
-
 
 function createMobileHeroLayer() {
 	const existingLayer = document.querySelector(".mobile-hero-layer");
@@ -3834,7 +3457,7 @@ function animateWindowToDesignY(targetDesignY, duration, onComplete) {
 		return;
 	}
 
-	const startTop = window.scrollY;
+	const startTop = getPageScrollTop();
 	const distance = targetTop - startTop;
 	const startTime = performance.now();
 
@@ -3879,7 +3502,6 @@ function scrollToBurden() {
 let landingFirstScrollHandled = false;
 let landingScrollSnapInProgress = false;
 let landingTouchStartY = null;
-let landingSnapReleaseTimer = null;
 
 function isWithinLandingAdvanceRange() {
 	const targetDesignY = getDiseaseNavigationTop();
@@ -3901,12 +3523,7 @@ function lockLandingAtTarget(targetDesignY) {
 
 function releaseLandingSnap(targetDesignY) {
 	lockLandingAtTarget(targetDesignY);
-
-	window.clearTimeout(landingSnapReleaseTimer);
-	landingSnapReleaseTimer = window.setTimeout(() => {
-		lockLandingAtTarget(targetDesignY);
-		landingScrollSnapInProgress = false;
-	}, 420);
+	landingScrollSnapInProgress = false;
 }
 
 function triggerLandingAdvance(event) {
@@ -3930,7 +3547,6 @@ function triggerLandingAdvance(event) {
 
 	landingFirstScrollHandled = true;
 	landingScrollSnapInProgress = true;
-	window.clearTimeout(landingSnapReleaseTimer);
 
 	animateWindowToDesignY(targetDesignY, animationDuration, () => {
 		releaseLandingSnap(targetDesignY);
@@ -4022,12 +3638,12 @@ let decisionWheelGestureTimer = null;
 let decisionBubbleSnapInProgress = false;
 
 function handleDecisionIntroWheel(event) {
-	if (event.deltaY <= 0 || typeof SAFETY_SCENE_DEFS === "undefined") {
+	if (event.deltaY <= 0 || typeof PINNED_SCENE_DEFS === "undefined") {
 		return;
 	}
 
-	const introDef = SAFETY_SCENE_DEFS.find((def) => def.id === "decision-intro");
-	const bubbleDef = SAFETY_SCENE_DEFS.find((def) => def.id === "decision-conclusion");
+	const introDef = PINNED_SCENE_DEFS.find((def) => def.id === "decision-intro");
+	const bubbleDef = PINNED_SCENE_DEFS.find((def) => def.id === "decision-conclusion");
 
 	if (!introDef || !bubbleDef || !Number.isFinite(introDef._top) || !Number.isFinite(bubbleDef._top)) {
 		return;
@@ -4074,20 +3690,10 @@ function handleDecisionIntroWheel(event) {
 	decisionWheelGestureCount = 0;
 
 	const targetDesignY = bubbleDef._top + 430;
-	scrollState.targetDesignY = targetDesignY;
-	if (prefersReducedMotion) {
-		scrollState.currentDesignY = targetDesignY;
-	}
-	window.scrollTo({
-		top: designYToScrollTop(targetDesignY),
-		behavior: prefersReducedMotion ? "auto" : "smooth"
-	});
-	requestScrollSceneFrame();
-
-	window.setTimeout(() => {
+	animateWindowToDesignY(targetDesignY, prefersReducedMotion ? 0 : 720, () => {
 		decisionBubbleSnapInProgress = false;
 		decisionWheelGestureActive = false;
-	}, prefersReducedMotion ? 80 : 850);
+	});
 }
 
 function renderIntro() {
@@ -4116,88 +3722,7 @@ function renderEffectivenessRange() {
 	addEffectivenessRangeScrollScene('effectivenessRange', 28855);
 }
 
-function renderSafety() {
-	addChart("safety", {
-		top: 34911,
-		className: 'safety-first-chart',
-		title: "Serious Adverse Event<br>in the <span class=\"blue\">Placebo</span> Group",
-		count: 22,
-		colour: "purple",
-		mean: "Mean: <span class=\"purple\">22</span> cases",
-		legend: "Case of serious adverse event",
-		hasRange: false
-	});
-	addCard("safety", "<span class=\"purple\">The study shows that</span> about <span class=\"purple\">22</span> in every 1000 people who do not receive the vaccine had serious adverse events.", 30140);
 
-	addChart("safety", {
-		top: 30795,
-		title: "Serious Adverse Event<br>in the <span class=\"blue\">Vaccinated</span> Group",
-		count: 23,
-		colour: "purple",
-		mean: "Mean: <span class=\"purple\">23</span> cases",
-		legend: "Case of serious adverse event",
-		hasRange: false
-	});
-	addCard("safety", "The study shows that about <span class=\"purple\">23</span> in every 1000 people who receive the vaccine<br>had serious adverse events.", 31680);
-	addCard("safety", "But how about uncertainty in the study data?", 32411);
-
-	addChart("safety", {
-		top: 32873,
-		title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Placebo</span> Group",
-		count: 22,
-		colour: "purple",
-		rangeStart: 20,
-		rangeEnd: 24,
-		mean: "<span class=\"purple\">20~24</span> cases<br>(Mean: <span class=\"purple\">22</span> cases)",
-		legend: "Case of serious adverse event",
-		hasRange: true
-	});
-	addCard("safety", "The number of people who experience a serious adverse event in the placebo group is likely between <span class=\"purple\">20</span> and <span class=\"purple\">24</span> in every 1000 people.", 33764);
-
-	addChart("safety", {
-		top: 34451,
-		title: "The Uncertainty Range of Serious Adverse Event in the <span class=\"blue\">Vaccinated</span> Group",
-		count: 23,
-		colour: "purple",
-		rangeStart: 21,
-		rangeEnd: 26,
-		mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)",
-		legend: "Case of serious adverse event",
-		hasRange: true
-	});
-	addCard("safety", "The number of people who experience a serious adverse event in the vaccinated group is likely between <span class=\"purple\">21</span> and <span class=\"purple\">26</span> in every 1000 people.", 35341);
-
-	addCompare("safety", {
-		top: 36027,
-		title: "The Serious Adverse Event of Vaccination",
-		colour: "purple",
-		arrowFile: "arrow2.png",
-		arrowAlt: "An up arrow showing slightly more serious adverse events after vaccination",
-		legend: "Case of serious adverse event",
-		left: {
-			count: 22,
-			rangeStart: 20,
-			rangeEnd: 24,
-			mean: "<span class=\"purple\">20~24</span> cases<br>(Mean: <span class=\"purple\">22</span> cases)"
-		},
-		right: {
-			count: 23,
-			rangeStart: 21,
-			rangeEnd: 26,
-			mean: "<span class=\"purple\">21~26</span> cases<br>(Mean: <span class=\"purple\">23</span> cases)"
-		}
-	});
-	addCard("safety", "For every 1,000 people, the vaccinated group<br>had an average of <span class=\"purple\">1</span> more serious adverse<br>event compared to the placebo group.", 36969);
-	addCard("safety", "The likely ranges overlapped and were close<br>to each other, at <span class=\"purple\">20</span> to <span class=\"purple\">24</span> cases<br>in the placebo group and <span class=\"purple\">21</span> to <span class=\"purple\">26</span> cases<br>in the vaccinated group", 37330);
-	addCard("safety", "This indicates no clear difference between the vaccinated and placebo groups in<br>serious adverse events.", 37691);
-}
-
-function renderClosing() {
-	addCard("closing", "This information may help you consider the possible benefits and harms of vaccination, while keeping the uncertainty inherent in the evidence in mind.", 38406);
-	addImage("closing", "own_factors_transparent_highres.png", "Personal factors for vaccination decision", 435, 38772, 1050, 847, "own-factors");
-	addCard("closing", "However, the results should be interpreted alongside your personal risk of herpes zoster and relevant circumstances, including your age, immune status, and medical history, for an informed vaccination decision.", 39684);
-	addParagraph("closing", "Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.", "closing final-message", 260, 40342, 1400);
-}
 
 function runRangeCountUp(meanElement) {
 	if (prefersReducedMotion || meanElement.dataset.counted === "true") {
@@ -4269,7 +3794,7 @@ function activatePlot(plot) {
 }
 
 function setupRevealObserver() {
-	if (prefersReducedMotion) {
+	if (prefersReducedMotion || typeof window.IntersectionObserver !== "function") {
 		document.querySelectorAll(".reveal, .reveal-card, .reveal-scale").forEach((element) => {
 			element.classList.add("is-visible");
 		});
@@ -4318,6 +3843,12 @@ function setupRevealObserver() {
 	});
 }
 
+const progressUi = {
+	bar: null,
+	fill: null,
+	dots: []
+};
+
 function addTopProgressBar() {
 	if (document.querySelector('.story-top-progress') !== null) {
 		return;
@@ -4332,12 +3863,14 @@ function addTopProgressBar() {
 	const fill = makeElement('div', 'story-top-progress-fill');
 	bar.appendChild(fill);
 	document.body.appendChild(bar);
+	progressUi.bar = bar;
+	progressUi.fill = fill;
 	updateTopProgressBar();
 }
 
 function updateTopProgressBar() {
-	const bar = document.querySelector('.story-top-progress');
-	const fill = document.querySelector('.story-top-progress-fill');
+	const bar = progressUi.bar || document.querySelector('.story-top-progress');
+	const fill = progressUi.fill || document.querySelector('.story-top-progress-fill');
 	if (bar === null || fill === null) {
 		return;
 	}
@@ -4366,6 +3899,7 @@ function addProgressRail() {
 	});
 
 	document.body.appendChild(rail);
+	progressUi.dots = Array.from(rail.querySelectorAll(".progress-dot"));
 	updateProgressRail();
 }
 
@@ -4381,7 +3915,7 @@ function updateProgressRail() {
 		}
 	});
 
-	document.querySelectorAll(".progress-dot").forEach((button) => {
+	(progressUi.dots.length ? progressUi.dots : document.querySelectorAll(".progress-dot")).forEach((button) => {
 		const active = button.dataset.section === activeKey;
 		button.classList.toggle("is-active", active);
 		if (active) {
@@ -4436,15 +3970,34 @@ function buildScrollamaSteps() {
 }
 
 function renderFromScrollama() {
-
 	if (isControlledScrolling || landingScrollSnapInProgress) {
 		return;
 	}
 
 	const designY = readDesignScrollY();
 	scrollState.targetDesignY = designY;
-	scrollState.currentDesignY = designY;
-	updateScrollDrivenScenes(designY);
+
+	if (prefersReducedMotion) {
+		scrollState.currentDesignY = designY;
+		updateScrollDrivenScenes(designY);
+		return;
+	}
+
+	requestScrollSceneFrame();
+}
+
+let nativeScrollRenderQueued = false;
+
+function handleNativeStoryScroll() {
+	if (nativeScrollRenderQueued) {
+		return;
+	}
+
+	nativeScrollRenderQueued = true;
+	window.requestAnimationFrame(() => {
+		nativeScrollRenderQueued = false;
+		renderFromScrollama();
+	});
 }
 
 function setActiveScrollamaStep(response) {
@@ -4460,47 +4013,55 @@ function setupScrollamaState() {
 	buildScrollamaSteps();
 	syncScrollStateToWindow(true);
 
-	if (typeof window.scrollama !== "function") {
-		window.addEventListener("scroll", renderFromScrollama, {
-			passive: true
-		});
+	window.addEventListener("scroll", handleNativeStoryScroll, {
+		passive: true
+	});
+
+	if (typeof window.scrollama !== "function" || typeof window.IntersectionObserver !== "function") {
 		renderFromScrollama();
 		return;
 	}
 
-	storyScroller = window.scrollama();
-	storyScroller
-		.setup({
-			step: ".scrollama-step",
-			offset: 0.5,
-			progress: true,
-			threshold: 4,
-			once: false
-		})
-		.onStepEnter((response) => {
-			setActiveScrollamaStep(response);
-			renderFromScrollama();
-		})
-		.onStepProgress(() => {
-			renderFromScrollama();
-		})
-		.onStepExit((response) => {
-			if (response && response.element) {
-				response.element.classList.remove("is-active");
-			}
-			renderFromScrollama();
-		});
+	try {
+		storyScroller = window.scrollama();
+		storyScroller
+			.setup({
+				step: ".scrollama-step",
+				offset: 0.5,
+				progress: true,
+				threshold: 4,
+				once: false
+			})
+			.onStepEnter((response) => {
+				setActiveScrollamaStep(response);
+				renderFromScrollama();
+			})
+			.onStepProgress(() => {
+				renderFromScrollama();
+			})
+			.onStepExit((response) => {
+				if (response && response.element) {
+					response.element.classList.remove("is-active");
+				}
+				renderFromScrollama();
+			});
+	} catch (error) {
+		storyScroller = null;
+	}
 
 	renderFromScrollama();
 }
 
-const SAFETY_PIN_BASE = 40525;
+const EFFECTIVENESS_HANDOFF_OVERLAP = 400;
+const PINNED_SCENE_BASE = ARTICLE_FEATURES.showUncertainty ?
+	40525 :
+	19505 - EFFECTIVENESS_HANDOFF_OVERLAP;
 const PAGE_REVEAL = 2600;
 const STANDARD_BUBBLE_TRAVEL = SPEECH_SCROLL_DISTANCE;
 const PAGE_BUBBLE = STANDARD_BUBBLE_TRAVEL;
 const PAGE_FADE = 1100;
 
-const SAFETY_SCENE_DEFS = [{
+const UNCERTAINTY_PINNED_SCENES = [{
 		id: 'sfa-1',
 		kind: 'chart',
 		revealDist: 420,
@@ -4513,7 +4074,7 @@ const SAFETY_SCENE_DEFS = [{
 			mean: 22,
 			hasRange: false
 		},
-		bubbles: ['<span class="grey">The study shows that</span> about <span class="purple">22</span> in every 1000 people<br>who do not receive the vaccine<span class="grey"> would experience serious adverse events.</span>']
+		bubbles: ['<span class="grey">The study shows that</span> about <span class="purple">22</span> in every 1,000 people<br>who did not receive the vaccine<span class="grey"> would experience serious adverse events.</span>']
 	},
 	{
 		id: 'sfa-2',
@@ -4527,7 +4088,7 @@ const SAFETY_SCENE_DEFS = [{
 			hasRange: false
 		},
 		bubbles: [
-			'About <span class="purple">23</span> in every 1000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>',
+			'About <span class="purple">23</span> in every 1,000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>',
 			'But how about uncertainty in the study data?'
 		]
 	},
@@ -4544,7 +4105,7 @@ const SAFETY_SCENE_DEFS = [{
 			mean: 22,
 			hasRange: true
 		},
-		bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the placebo group is likely to be</span> between about <span class="purple">20</span> and <span class="purple">24</span> in every 1000 people.']
+		bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the placebo group is likely to be</span> between about <span class="purple">20</span> and <span class="purple">24</span> in every 1,000 people.']
 	},
 	{
 		id: 'sfa-4',
@@ -4559,7 +4120,7 @@ const SAFETY_SCENE_DEFS = [{
 			mean: 23,
 			hasRange: true
 		},
-		bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the vaccinated group is likely to be</span> between about <span class="purple">21</span> and <span class="purple">26</span> in every 1000 people.']
+		bubbles: ['<span class="grey">The number of people who experience a serious adverse event in the vaccinated group is likely to be</span> between about <span class="purple">21</span> and <span class="purple">26</span> in every 1,000 people.']
 	},
 	{
 		id: 'sfa-5',
@@ -4568,6 +4129,7 @@ const SAFETY_SCENE_DEFS = [{
 		compare: {
 			title: 'The Serious Adverse Event of Vaccination',
 			colour: 'purple',
+			hasRange: true,
 			arrowFile: 'arrow2.png',
 			arrowAlt: 'An up arrow showing slightly more serious adverse events after vaccination',
 			hideArrow: true,
@@ -4595,7 +4157,7 @@ const SAFETY_SCENE_DEFS = [{
 		kind: 'intro',
 		overlapBefore: 900,
 		title: 'Making a Vaccination <span class="blue">Decision</span>',
-		subtitle: 'How should this study findings be interpreted in vaccination decision-making?'
+		subtitle: 'How should these study findings be interpreted when making a vaccination decision?'
 	},
 	{
 		id: 'decision-conclusion',
@@ -4603,7 +4165,7 @@ const SAFETY_SCENE_DEFS = [{
 		bubbleSpacing: 1900,
 		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
 		bubbles: [
-			'<span class="grey">Overall, this study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while there are likely</span> no clear evidence of a difference in serious adverse events between groups.'
+			'<span class="grey">Overall, this study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while the evidence suggests</span> no clear difference in serious adverse events between groups.'
 		]
 	},
 	{
@@ -4618,7 +4180,7 @@ const SAFETY_SCENE_DEFS = [{
 		imageFile: 'own_factors_transparent_highres.png',
 		imageAlt: 'Personal factors for vaccination decision',
 		bubbles: [
-			'<span class="grey">However, these findings describe</span> average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster <span class="grey">influenced by age, immune status, medical history.</span>',
+			'<span class="grey">However, these findings describe</span> average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster, <span class="grey">which is influenced by age, immune status, and medical history.</span>',
 			'<span class="grey">Therefore, vaccination decisions can be better informed by</span> weighing the expected benefits, possible harms, uncertainty, and individual context.'
 		]
 	},
@@ -4638,10 +4200,169 @@ const SAFETY_SCENE_DEFS = [{
 	}
 ];
 
+const POINT_ESTIMATE_PINNED_SCENES = [{
+		id: 'effectiveness-compare',
+		kind: 'compare',
+		revealDist: 1400,
+		transparentLayer: true,
+		fadeBackgroundWithLastBubble: true,
+		backgroundFadeBubbleProgress: 0.80,
+		backgroundFadeDuration: 800,
+		compare: {
+			title: 'The Effectiveness of Vaccination',
+			colour: 'red',
+			hasRange: false,
+			arrowFile: 'arrow1.png',
+			arrowAlt: 'A down arrow showing fewer herpes zoster cases after vaccination',
+			left: {
+				count: 33,
+				mean: 33
+			},
+			right: {
+				count: 16,
+				mean: 16
+			}
+		},
+		bubbles: [
+			'So for every 1,000 people, vaccination reduced an average of <span class="red">17</span> herpes zoster cases <span class="grey">compared to the placebo group.</span>',
+			'<span class="grey">This indicates</span> the herpes zoster vaccine appears to prevent the risk of developing it.'
+		]
+	},
+	{
+		id: 'safety-intro',
+		kind: 'intro-with-bubble',
+		revealDist: 1500,
+		title: 'The <span class="blue">Safety</span> of Vaccination',
+		subtitle: 'How many people experienced a <span class="blue">serious adverse event</span><br>in the placebo group and in the vaccinated group?',
+		bubbles: [
+			'Serious adverse events refer to severe outcomes such as death, life-threatening conditions, <span class="grey">hospitalisation, disability or permanent damage, congenital anomalies/birth defects, required intervention to prevent permanent impairment or damage, </span>or other important medical events.'
+		]
+	},
+	{
+		id: 'sfa-1',
+		kind: 'chart',
+		revealDist: 420,
+		bubbleStart: 420,
+		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+		chart: {
+			title: 'Serious Adverse Event<br>in the <span class="blue">Placebo</span> Group',
+			count: 22,
+			colour: 'purple',
+			mean: 22,
+			hasRange: false
+		},
+		bubbles: ['<span class="grey">The study shows that</span> about <span class="purple">22</span> in every 1,000 people<br>who did not receive the vaccine<span class="grey"> would experience serious adverse events.</span>']
+	},
+	{
+		id: 'sfa-2',
+		kind: 'chart',
+		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+		chart: {
+			title: 'Serious Adverse Event<br>in the <span class="blue">Vaccinated</span> Group',
+			count: 23,
+			colour: 'purple',
+			mean: 23,
+			hasRange: false
+		},
+		bubbles: ['About <span class="purple">23</span> in every 1,000 people who receive the vaccine <span class="grey">likely experience serious adverse events.</span>']
+	},
+	{
+		id: 'sfa-compare',
+		kind: 'compare',
+		revealDist: 2200,
+		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+		compare: {
+			title: 'The Serious Adverse Event of Vaccination',
+			colour: 'purple',
+			hasRange: false,
+			hideArrow: true,
+			left: {
+				count: 22,
+				mean: 22
+			},
+			right: {
+				count: 23,
+				mean: 23
+			}
+		},
+		bubbles: [
+			'So for every 1,000 people, the vaccinated group<br>had an average of <span class="purple">1</span> more serious adverse<br>event <span class="grey">compared to the placebo group.</span>',
+			'<span class="grey">This indicates</span> no clear difference between the vaccinated and placebo groups in serious adverse events.'
+		]
+	},
+	{
+		id: 'decision-intro',
+		kind: 'intro',
+		overlapBefore: 900,
+		title: 'Making a Vaccination <span class="blue">Decision</span>',
+		subtitle: 'How should these study findings be interpreted when making a vaccination decision?'
+	},
+	{
+		id: 'decision-conclusion',
+		kind: 'bubbles',
+		bubbleSpacing: 1900,
+		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+		bubbles: [
+			'<span class="grey">Overall, this study shows</span> vaccination prevented the occurrence of herpes zoster, <span class="grey">while the evidence suggests</span> no clear difference in serious adverse events between groups.'
+		]
+	},
+	{
+		id: 'sfa-7',
+		kind: 'closing',
+		bubbleStart: 0,
+		overlapBefore: 720,
+		revealDist: 1800,
+		bgStart: 300,
+		bubbleSpacing: 1900,
+		bubbleTravel: STANDARD_BUBBLE_TRAVEL,
+		imageFile: 'own_factors_transparent_highres.png',
+		imageAlt: 'Personal factors for vaccination decision',
+		bubbles: [
+			'<span class="grey">However, these findings describe</span> average outcomes in the study population, and the expected benefit varies with personal risk of herpes zoster, <span class="grey">which is influenced by age, immune status, and medical history.</span>',
+			'<span class="grey">Therefore, vaccination decisions can be better informed by</span> weighing the expected benefits, possible harms, and individual context.'
+		]
+	},
+	{
+		id: 'sfa-msg',
+		kind: 'message',
+		message: 'Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.',
+		sources: [{
+				label: 'Cochrane Library — Vaccines for preventing herpes zoster in older adults',
+				url: 'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD008858.pub5/full'
+			},
+			{
+				label: 'World Health Organization — Shingles (herpes zoster)',
+				url: 'https://www.who.int/news-room/fact-sheets/detail/shingles-(herpes-zoster)'
+			}
+		]
+	}
+];
+
+const PINNED_SCENE_DEFS = ARTICLE_FEATURES.showUncertainty ?
+	UNCERTAINTY_PINNED_SCENES :
+	POINT_ESTIMATE_PINNED_SCENES;
+
 const PAGE_MESSAGE_REVEAL = 1200;
 const PAGE_MESSAGE_HOLD = 3500;
 
-function safetyPageDuration(def) {
+function getPinnedBackgroundFadeTiming(def, bubbleBase, bubbleSpacing, bubbleTravel, bubbleCount) {
+	const defaultStart = bubbleBase + (bubbleCount > 0 ?
+		(((bubbleCount - 1) * bubbleSpacing) + bubbleTravel) :
+		0);
+	const lastBubbleStart = bubbleBase + (bubbleCount > 0 ?
+		((bubbleCount - 1) * bubbleSpacing) :
+		0);
+	const start = def.fadeBackgroundWithLastBubble === true && bubbleCount > 0 ?
+		lastBubbleStart + (bubbleTravel * clamp(Number(def.backgroundFadeBubbleProgress) || 0.80, 0, 1)) :
+		defaultStart;
+	const duration = Math.max(1, Number(def.backgroundFadeDuration) || PAGE_FADE);
+	return {
+		start,
+		duration
+	};
+}
+
+function getPinnedPageDuration(def) {
 	if (def.kind === 'message') {
 		return PAGE_MESSAGE_REVEAL + PAGE_MESSAGE_HOLD;
 	}
@@ -4656,10 +4377,12 @@ function safetyPageDuration(def) {
 		return bubbleRun + 400;
 	}
 	const base = def.bubbleStart !== undefined ? def.bubbleStart : PAGE_REVEAL;
-	return base + bubbleRun + PAGE_FADE;
+	const fadeTiming = getPinnedBackgroundFadeTiming(def, base, bubbleSpacing, bubbleTravel, nB);
+	const bubbleEnd = base + bubbleRun;
+	return Math.max(bubbleEnd, fadeTiming.start + fadeTiming.duration);
 }
 
-function makeSafetyChart(cfg) {
+function makePinnedChart(cfg) {
 	const chart = makeElement('section', 'chart-section pinned-page-chart');
 	chart.appendChild(makeElement('h3', '', cfg.title));
 
@@ -4685,7 +4408,7 @@ function makeSafetyChart(cfg) {
 	return chart;
 }
 
-function makeSafetyCompare(cfg) {
+function makePinnedCompare(cfg) {
 	const compare = makeElement('section', 'compare-section pinned-page-compare');
 
 	const title = makeElement('h2', 'title compare-title', cfg.title);
@@ -4704,24 +4427,29 @@ function makeSafetyCompare(cfg) {
 	setBox(vs, 906, 105, 108, 108);
 	compare.appendChild(vs);
 
+	const hasRange = cfg.hasRange === true;
 	const makeSide = (side, sideClass, left) => {
 		const sidePlot = makeElement('div', 'side-plot ' + sideClass);
 		setBox(sidePlot, left, 245, 830, 520);
 		const dots = makeDotPlot(side.count, cfg.colour, side.rangeStart, side.rangeEnd);
 		dots.classList.add('pin-managed-plot');
 		sidePlot.appendChild(dots);
-		const mean = makeElement('p', 'mean', `<span class="${cfg.colour}">0~0</span> cases<br>(Mean: <span class="${cfg.colour}">0</span> cases)`);
-		mean.dataset.rangeCountUp = 'true';
-		mean.dataset.rangeStart = String(side.rangeStart);
-		mean.dataset.rangeEnd = String(side.rangeEnd);
+		const mean = makeElement('p', 'mean', '');
 		mean.dataset.countUp = String(side.mean);
 		mean.dataset.colour = cfg.colour;
+		if (hasRange) {
+			mean.dataset.rangeCountUp = 'true';
+			mean.dataset.rangeStart = String(side.rangeStart);
+			mean.dataset.rangeEnd = String(side.rangeEnd);
+			mean.innerHTML = `<span class="${cfg.colour}">0~0</span> cases<br>(Mean: <span class="${cfg.colour}">0</span> cases)`;
+		} else {
+			mean.innerHTML = `Mean: <span class="${cfg.colour}">0</span> cases`;
+		}
 		sidePlot.appendChild(mean);
 		return sidePlot;
 	};
 
 	compare.appendChild(makeSide(cfg.left, 'pinned-page-compare-left', 65));
-
 	if (cfg.hideArrow !== true) {
 		const arrow = document.createElement('img');
 		arrow.className = 'arrow-icon';
@@ -4730,9 +4458,8 @@ function makeSafetyCompare(cfg) {
 		setBox(arrow, 886, 352, 148, 148);
 		compare.appendChild(arrow);
 	}
-
 	compare.appendChild(makeSide(cfg.right, 'pinned-page-compare-right', 1025));
-	compare.appendChild(makeLegend(cfg.colour, 'Case of serious adverse event', true));
+	compare.appendChild(makeLegend(cfg.colour, cfg.colour === 'red' ? 'Case of herpes zoster' : 'Case of serious adverse event', hasRange));
 	return compare;
 }
 
@@ -4741,28 +4468,38 @@ function buildPinnedPageLayer(def) {
 	if (def.kind === 'intro') {
 		layer.classList.add('pinned-page-layer--decision-intro');
 	}
+	if (def.transparentLayer === true) {
+		layer.classList.add('pinned-page-layer--transparent');
+	}
 	layer.dataset.sceneId = def.id;
 	const content = makeElement('div', 'pinned-page-content');
 
 	if (def.kind === 'chart') {
-		const chart = makeSafetyChart(def.chart);
+		const chart = makePinnedChart(def.chart);
 		setBox(chart, 410, 160, 1100, 760);
 		content.appendChild(chart);
 		def._bgSelector = '.pinned-page-chart';
 	} else if (def.kind === 'compare') {
-		const compare = makeSafetyCompare(def.compare);
+		const compare = makePinnedCompare(def.compare);
 		setBox(compare, 0, 112, 1920, 850);
 		content.appendChild(compare);
 		def._bgSelector = '.pinned-page-compare';
-	} else if (def.kind === 'intro') {
-		const intro = makeElement('section', 'decision-intro-block');
-		const title = makeElement('h2', 'title section-title decision-intro-title', def.title);
-		intro.appendChild(title);
-		const subtitle = makeElement('p', 'subtitle decision-intro-subtitle', def.subtitle);
-		intro.appendChild(subtitle);
+	} else if (def.kind === 'intro' || def.kind === 'intro-with-bubble') {
+		const introClass = def.kind === 'intro-with-bubble' ?
+			'decision-intro-block safety-intro-block' :
+			'decision-intro-block';
+		const titleClass = def.kind === 'intro-with-bubble' ?
+			'title section-title decision-intro-title safety-intro-title' :
+			'title section-title decision-intro-title';
+		const subtitleClass = def.kind === 'intro-with-bubble' ?
+			'subtitle decision-intro-subtitle safety-intro-subtitle' :
+			'subtitle decision-intro-subtitle';
+		const intro = makeElement('section', introClass);
+		intro.appendChild(makeElement('h2', titleClass, def.title));
+		intro.appendChild(makeElement('p', subtitleClass, def.subtitle));
 		setBox(intro, 260, 0, 1400, 1080);
 		content.appendChild(intro);
-		def._bgSelector = '.decision-intro-block';
+		def._bgSelector = def.kind === 'intro-with-bubble' ? '.safety-intro-block' : '.decision-intro-block';
 	} else if (def.kind === 'closing') {
 		const img = document.createElement('img');
 		img.className = 'asset pinned-page-illustration';
@@ -4775,7 +4512,6 @@ function buildPinnedPageLayer(def) {
 		const msg = makeElement('p', 'closing final-message pinned-page-message', def.message);
 		setBox(msg, 260, 330, 1400, 300);
 		content.appendChild(msg);
-
 		if (Array.isArray(def.sources) && def.sources.length > 0) {
 			const sources = makeElement('aside', 'data-sources');
 			sources.setAttribute('aria-label', 'Data sources');
@@ -4803,9 +4539,9 @@ function buildPinnedPageLayer(def) {
 		setBox(card, 464, 0, 993, 301);
 		content.appendChild(card);
 	});
-
 	layer.appendChild(content);
 	document.body.appendChild(layer);
+	def._elements = { layer, content };
 }
 
 function revealPinnedChart(chart, p, layerOpacity) {
@@ -4859,14 +4595,11 @@ function revealPinnedChart(chart, p, layerOpacity) {
 }
 
 function revealPinnedCompare(compare, p, layerOpacity) {
-	if (compare === null) {
-		return;
-	}
+	if (compare === null) return;
 	const reveal = smoothStep(0.10, 0.24, p);
 	const opacity = reveal * layerOpacity;
 	compare.style.opacity = opacity.toFixed(3);
 	compare.style.visibility = opacity > 0.02 ? 'visible' : 'hidden';
-
 	const dotProgress = clamp(p / 0.66, 0, 1);
 	compare.querySelectorAll('.dot-plot').forEach((plot) => {
 		applyDotMorph(plot, dotProgress, {
@@ -4878,7 +4611,6 @@ function revealPinnedCompare(compare, p, layerOpacity) {
 		});
 		plot.style.opacity = opacity.toFixed(3);
 	});
-
 	const rangeReveal = smoothStep(0.66, 0.84, p);
 	compare.querySelectorAll('.range-background').forEach((el) => {
 		el.style.opacity = (opacity * rangeReveal).toFixed(3);
@@ -4888,18 +4620,19 @@ function revealPinnedCompare(compare, p, layerOpacity) {
 		el.style.opacity = (opacity * rangeReveal).toFixed(3);
 		el.style.transform = `scaleY(${(0.7 + (rangeReveal * 0.3)).toFixed(3)})`;
 	});
-
 	const countProgress = clamp((p - 0.50) / 0.42, 0, 1);
-	compare.querySelectorAll('.mean[data-range-count-up]').forEach((mean) => {
-		setScrollTiedRangeCount(mean, parseInt(mean.dataset.rangeStart, 10), parseInt(mean.dataset.rangeEnd, 10), parseInt(mean.dataset.countUp, 10), mean.dataset.colour, countProgress);
+	compare.querySelectorAll('.mean[data-count-up]').forEach((mean) => {
+		if (mean.dataset.rangeCountUp === 'true') {
+			setScrollTiedRangeCount(mean, parseInt(mean.dataset.rangeStart, 10), parseInt(mean.dataset.rangeEnd, 10), parseInt(mean.dataset.countUp, 10), mean.dataset.colour, countProgress);
+		} else {
+			setScrollTiedMeanCount(mean, parseInt(mean.dataset.countUp, 10), mean.dataset.colour, countProgress);
+		}
 		mean.style.opacity = opacity.toFixed(3);
 	});
-
 	compare.querySelectorAll('h2, .compare-label, .vs, .legend').forEach((el) => {
 		el.style.opacity = (opacity * reveal).toFixed(3);
 		el.style.transform = reveal > 0.01 ? 'translate3d(0, 0, 0)' : 'translate3d(0, 10px, 0)';
 	});
-
 	const arrow = compare.querySelector('.arrow-icon');
 	if (arrow !== null) {
 		const arrowReveal = smoothStep(0.74, 0.90, p);
@@ -4909,17 +4642,17 @@ function revealPinnedCompare(compare, p, layerOpacity) {
 }
 
 function updatePinnedPage(def, currentDesignY, progressDesignY) {
-	const layer = document.querySelector(`.pinned-page-layer[data-scene-id="${def.id}"]`);
-	if (layer === null) {
+	const layer = def._elements && def._elements.layer;
+	if (!layer) {
 		return;
 	}
 	const pinStart = def._top;
 	const pinDuration = def._pinDuration;
 	const pinEnd = pinStart + pinDuration;
 	const scrollDist = progressDesignY - pinStart;
+	const speechScrollDist = readDesignScrollY() - pinStart;
 	const isPinned = getScenePinnedState(currentDesignY, pinStart, pinEnd);
-	const content = layer.querySelector('.pinned-page-content');
-
+	const content = def._elements && def._elements.content;
 	const overall = clamp(scrollDist / pinDuration, 0, 1);
 	const layerOpacity = isPinned ? smoothStep(0.0, 0.02, overall) : 0;
 	layer.classList.toggle('is-active', isPinned);
@@ -4928,7 +4661,9 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
 		content.style.top = `${Math.round(getPinOffsetY())}px`;
 		content.style.opacity = layerOpacity.toFixed(3);
 	}
-
+	if (!content) {
+		return;
+	}
 	if (def.kind === 'intro') {
 		const intro = content.querySelector('.decision-intro-block');
 		const reveal = smoothStep(0.00, 0.30, overall);
@@ -4941,7 +4676,6 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
 		}
 		return;
 	}
-
 	if (def.kind === 'message') {
 		const msg = content.querySelector('.pinned-page-message');
 		const revealP = clamp(scrollDist / PAGE_MESSAGE_REVEAL, 0, 1);
@@ -4962,23 +4696,30 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
 		}
 		return;
 	}
-
 	const nB = def.bubbles ? def.bubbles.length : 0;
-	const bubbleBase = (def.kind === 'bubbles') ? 0 : (def.bubbleStart !== undefined ? def.bubbleStart : PAGE_REVEAL);
+	const bubbleBase = def.kind === 'bubbles' ? 0 : (def.bubbleStart !== undefined ? def.bubbleStart : PAGE_REVEAL);
 	const revealDist = def.revealDist !== undefined ? def.revealDist : PAGE_REVEAL;
 	const bubbleSpacing = def.bubbleSpacing !== undefined ? def.bubbleSpacing : PAGE_BUBBLE;
 	const bubbleTravel = def.bubbleTravel !== undefined ? def.bubbleTravel : PAGE_BUBBLE;
-	const bgFadeStart = bubbleBase + (nB > 0 ? (((nB - 1) * bubbleSpacing) + bubbleTravel) : 0);
-
+	const bgFadeTiming = getPinnedBackgroundFadeTiming(def, bubbleBase, bubbleSpacing, bubbleTravel, nB);
+	const bgFadeStart = bgFadeTiming.start;
+	const bgFadeDuration = bgFadeTiming.duration;
 	if (def.kind !== 'bubbles') {
 		const revealP = clamp(scrollDist / revealDist, 0, 1);
 		const bg = content.querySelector(def._bgSelector);
-		const bgHold = 1 - clamp((scrollDist - bgFadeStart) / PAGE_FADE, 0, 1);
-
+		const bgHold = 1 - clamp((scrollDist - bgFadeStart) / bgFadeDuration, 0, 1);
 		if (def.kind === 'chart') {
 			revealPinnedChart(bg, revealP, layerOpacity);
 		} else if (def.kind === 'compare') {
 			revealPinnedCompare(bg, revealP, layerOpacity);
+		} else if (def.kind === 'intro-with-bubble') {
+			const reveal = smoothStep(0.00, 0.48, revealP);
+			const o = reveal * layerOpacity;
+			if (bg !== null) {
+				bg.style.opacity = o.toFixed(3);
+				bg.style.visibility = o > 0.02 ? 'visible' : 'hidden';
+				bg.style.transform = `translate3d(0, ${lerp(20, 0, reveal).toFixed(1)}px, 0)`;
+			}
 		} else if (def.kind === 'closing') {
 			const bgStart = def.bgStart || 0;
 			const bgRevealP = clamp((scrollDist - bgStart) / revealDist, 0, 1);
@@ -4991,57 +4732,49 @@ function updatePinnedPage(def, currentDesignY, progressDesignY) {
 				bg.style.filter = `blur(${lerp(12, 0, introReveal).toFixed(2)}px)`;
 			}
 		}
-
 		if (bg !== null && scrollDist >= bgFadeStart) {
 			const o = layerOpacity * bgHold;
 			bg.style.opacity = o.toFixed(3);
 			bg.style.visibility = o > 0.02 ? 'visible' : 'hidden';
 		}
 	}
-
 	(def.bubbles || []).forEach((_, i) => {
 		const card = content.querySelector('.pinned-page-bubble-' + i);
-		if (card === null) {
-			return;
-		}
-		const p = clamp((scrollDist - bubbleBase - (i * bubbleSpacing)) / bubbleTravel, 0, 1);
+		if (card === null) return;
+		const startDistance = bubbleBase + (i * bubbleSpacing);
+		const p = getReferenceScrollItemProgress(card, speechScrollDist, startDistance);
 		setVaccineCardScrollPosition(card, p);
 	});
 }
 
 function updatePinnedPages(currentDesignY) {
 	currentDesignY = currentDesignY === undefined ? getAnimatedDesignY() : currentDesignY;
-	const progressDesignY = currentDesignY;
-	SAFETY_SCENE_DEFS.forEach((def) => updatePinnedPage(def, currentDesignY, progressDesignY));
+	PINNED_SCENE_DEFS.forEach((def) => updatePinnedPage(def, currentDesignY, currentDesignY));
 }
 
-function buildSafetyScenes() {
-	let cursor = SAFETY_PIN_BASE;
-	SAFETY_SCENE_DEFS.forEach((def) => {
+function buildPinnedScenes() {
+	let cursor = PINNED_SCENE_BASE;
+	PINNED_SCENE_DEFS.forEach((def) => {
 		const overlapBefore = Number(def.overlapBefore) || 0;
-		def._pinDuration = safetyPageDuration(def);
-		def._top = Math.max(SAFETY_PIN_BASE, cursor - overlapBefore);
+		def._pinDuration = getPinnedPageDuration(def);
+		def._top = Math.max(PINNED_SCENE_BASE, cursor - overlapBefore);
 		buildPinnedPageLayer(def);
 		cursor = def._top + def._pinDuration;
 	});
-
-	const closingDef = SAFETY_SCENE_DEFS.find((d) => d.kind === 'closing');
-	if (closingDef) {
-		sectionTops.closing = closingDef._top;
+	const safetyDef = PINNED_SCENE_DEFS.find((d) => d.id === 'safety-intro');
+	if (safetyDef) {
+		sectionTops.safety = safetyDef._top;
 	}
-
-	const msgDef = SAFETY_SCENE_DEFS[SAFETY_SCENE_DEFS.length - 1];
+	const closingDef = PINNED_SCENE_DEFS.find((d) => d.kind === 'closing');
+	if (closingDef) sectionTops.closing = closingDef._top;
+	const msgDef = PINNED_SCENE_DEFS[PINNED_SCENE_DEFS.length - 1];
 	const designViewport = window.innerHeight / (getScale() * getActiveTimelineScale());
 	const messageRevealEnd = msgDef._top + PAGE_MESSAGE_REVEAL;
 	const totalDesign = messageRevealEnd + 800 + designViewport;
 	const canvas = document.getElementById('canvas');
 	const stage = document.getElementById('stage');
-	if (canvas !== null) {
-		canvas.style.height = totalDesign + 'px';
-	}
-	if (stage !== null) {
-		stage.style.height = `calc(${totalDesign}px * var(--scale))`;
-	}
+	if (canvas !== null) canvas.style.height = totalDesign + 'px';
+	if (stage !== null) stage.style.height = `calc(${totalDesign}px * var(--scale))`;
 	return cursor;
 }
 
@@ -5054,20 +4787,12 @@ function addScrollTopButton() {
 	button.setAttribute('aria-label', 'Scroll back to the top');
 	button.innerHTML = '<span aria-hidden="true">\u2191</span>';
 	button.addEventListener('click', function() {
-		window.scrollTo({
-			top: 0,
-			behavior: prefersReducedMotion ? 'auto' : 'smooth'
-		});
+		animateWindowToDesignY(0, prefersReducedMotion ? 0 : 720);
 	});
 	document.body.appendChild(button);
 
 	const toggle = function() {
-		const scrollTop = Math.max(
-			window.scrollY || 0,
-			window.pageYOffset || 0,
-			document.documentElement ? document.documentElement.scrollTop : 0,
-			document.body ? document.body.scrollTop : 0
-		);
+		const scrollTop = getPageScrollTop();
 		const revealThreshold = isMobileLayout() ? 80 : 500;
 		button.classList.toggle('is-visible', scrollTop > revealThreshold);
 	};
@@ -5391,9 +5116,11 @@ function renderArticle() {
 	renderIntro();
 	createMobileHeroLayer();
 	renderEffectiveness();
-	renderUncertainty();
-	renderEffectivenessRange();
-	buildSafetyScenes();
+	if (ARTICLE_FEATURES.showUncertainty) {
+		renderUncertainty();
+		renderEffectivenessRange();
+	}
+	buildPinnedScenes();
 	applyTimelineStretch();
 	fillAllPlots();
 	setupRevealObserver();
@@ -5533,6 +5260,19 @@ window.addEventListener("orientationchange", () => {
 	}, 180);
 }, {
 	passive: true
+});
+
+window.addEventListener("pageshow", () => {
+	if (document.readyState !== "complete") {
+		return;
+	}
+
+	updateScale();
+	syncScrollStateToWindow(true);
+	updateScrollDrivenScenes(getAnimatedDesignY());
+	if (storyScroller !== null) {
+		storyScroller.resize();
+	}
 });
 
 window.addEventListener("load", function() {
