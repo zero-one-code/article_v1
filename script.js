@@ -4189,11 +4189,11 @@ const UNCERTAINTY_PINNED_SCENES = [{
 		kind: 'message',
 		message: 'Thank you for reading the article.<br>Please return to the original survey page<br>and answer the questions.',
 		sources: [{
-				label: 'Cochrane Library — Vaccines for preventing herpes zoster in older adults',
+				label: 'Cochrane Library - Vaccines for preventing herpes zoster in older adults',
 				url: 'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD008858.pub5/full'
 			},
 			{
-				label: 'World Health Organization — Shingles (herpes zoster)',
+				label: 'World Health Organization - Shingles (herpes zoster)',
 				url: 'https://www.who.int/news-room/fact-sheets/detail/shingles-(herpes-zoster)'
 			}
 		]
@@ -4515,7 +4515,7 @@ function buildPinnedPageLayer(def) {
 		if (Array.isArray(def.sources) && def.sources.length > 0) {
 			const sources = makeElement('aside', 'data-sources');
 			sources.setAttribute('aria-label', 'Data sources');
-			sources.appendChild(makeElement('p', 'data-sources-title', 'You can also click on the links below for more information on.'));
+			sources.appendChild(makeElement('p', 'data-sources-title', 'You can also click on the links below for more information.'));
 			const list = makeElement('ul', 'data-sources-list');
 			def.sources.forEach((source) => {
 				const item = makeElement('li', '');
