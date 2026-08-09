@@ -16,10 +16,12 @@
   --soft-red: #ec8c8f;
   --soft-purple: #ab97ff;
   --mobile-bg-scale: 1.12;
+  --viewport-height: 100vh;
 }
 
 html {
   scroll-behavior: auto;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -57,28 +59,43 @@ body {
   width: 1920px;
 }
 
-#section-intro {
+body[data-article-variant="v1"] #section-intro,
+body[data-article-variant="v2"] #section-intro {
   top: 0;
   height: 10570px;
 }
-#section-effectiveness {
+
+body[data-article-variant="v1"] #section-effectiveness {
   top: 10570px;
   height: 5150px;
 }
-#section-uncertainty {
+body[data-article-variant="v1"] #section-uncertainty {
   top: 15720px;
   height: 7150px;
 }
-#section-effectiveness-range {
+body[data-article-variant="v1"] #section-effectiveness-range {
   top: 22870px;
   height: 7250px;
 }
-#section-safety {
+body[data-article-variant="v1"] #section-safety {
   top: 30120px;
   height: 12800px;
 }
-#section-closing {
+body[data-article-variant="v1"] #section-closing {
   top: 42920px;
+  height: 2700px;
+}
+
+body[data-article-variant="v2"] #section-effectiveness {
+  top: 10570px;
+  height: 8935px;
+}
+body[data-article-variant="v2"] #section-safety {
+  top: 19505px;
+  height: 22000px;
+}
+body[data-article-variant="v2"] #section-closing {
+  top: 41505px;
   height: 2700px;
 }
 
@@ -156,15 +173,6 @@ body {
   color: var(--purple);
 }
 
-.scroll-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-  cursor: pointer;
-}
 
 .scroll-button span {
   display: block;
@@ -515,7 +523,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   background: #ffffff;
   opacity: 0;
   pointer-events: none;
@@ -528,7 +536,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -976,7 +984,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1055,7 +1063,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1141,7 +1149,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1277,7 +1285,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1420,7 +1428,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1573,7 +1581,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -1636,7 +1644,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -2252,7 +2260,7 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
@@ -2385,7 +2393,7 @@ svg {
 .scene-handoff-veil {
   width: 100vw;
   width: 100dvw;
-  height: 100vh;
+  height: var(--viewport-height, 100vh);
   height: 100dvh;
 }
 
@@ -4244,15 +4252,6 @@ svg {
   line-height: 1.15;
 }
 
-.mobile-scroll-hint .scroll-arrow {
-  display: block;
-  margin-top: 9px;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 34px;
-  font-weight: 400;
-  line-height: 1;
-  animation: scrollPrompt 1.55s ease-in-out infinite;
-}
 
 .data-sources {
   position: absolute;
@@ -4389,9 +4388,6 @@ svg {
   transform: none !important;
 }
 
-.mobile-scroll-hint {
-  width: min(310px, calc(100vw - 56px));
-}
 
 .uncertainty-concept-interval-note-stack {
   display: contents;
@@ -5343,4 +5339,77 @@ button {
   .mobile-scroll-hint .scroll-arrow {
     font-size: 40px;
   }
+}
+
+.safety-intro-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.pinned-page-layer--transparent {
+  background: transparent;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.noscript-message {
+  max-width: 760px;
+  margin: 40px auto;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px), (pointer: coarse) and (max-width: 1180px) {
+  .pinned-page-compare .compare-title {
+    top: -105px !important;
+  }
+
+  .safety-intro-title {
+    top: 360px !important;
+  }
+
+  .safety-intro-subtitle {
+    top: 515px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.scene-handoff-veil,
+.disease-pin-layer,
+.risk-pin-layer,
+.vaccine-pin-layer,
+.effectiveness-pin-layer,
+.reliability-pin-layer,
+.uncertainty-concept-pin-layer,
+.effectiveness-range-pin-layer,
+.pinned-page-layer,
+.mobile-hero-layer {
+  contain: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
