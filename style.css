@@ -173,7 +173,6 @@ body[data-article-variant="v2"] #section-closing {
   color: var(--purple);
 }
 
-
 .scroll-button span {
   display: block;
   margin-top: 10px;
@@ -4252,7 +4251,6 @@ svg {
   line-height: 1.15;
 }
 
-
 .data-sources {
   position: absolute;
   margin: 0;
@@ -4387,7 +4385,6 @@ svg {
   animation: none !important;
   transform: none !important;
 }
-
 
 .uncertainty-concept-interval-note-stack {
   display: contents;
