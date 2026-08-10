@@ -43,7 +43,9 @@ const SECTION_LAYOUTS = Object.freeze({
 	}
 });
 
-const sectionTops = { ...SECTION_LAYOUTS[ARTICLE_VARIANT] };
+const sectionTops = {
+	...SECTION_LAYOUTS[ARTICLE_VARIANT]
+};
 
 const sections = {
 	intro: document.getElementById("section-intro"),
@@ -54,8 +56,7 @@ const sections = {
 	closing: document.getElementById("section-closing")
 };
 
-const navSections = [
-	{
+const navSections = [{
 		key: "disease",
 		label: "Disease burden",
 		getTop: () => getDiseaseNavigationTop()
@@ -835,14 +836,16 @@ function getMobileSequenceTiming(index, count, sequenceEnd, options) {
 		Math.max(calculatedCardDistance, getMinimumMobileCardDistance()) :
 		calculatedCardDistance;
 	const startDistance = startPadding + (index * (cardDistance + gap));
-	return { cardDistance, startDistance };
+	return {
+		cardDistance,
+		startDistance
+	};
 
 }
 
 function getVariableSequenceTiming(index, durations, startPadding, gap) {
 	const safeDurations = Array.isArray(durations) && durations.length > 0 ?
-		durations.map((duration) => Math.max(1, Number(duration) || 1)) :
-		[1];
+		durations.map((duration) => Math.max(1, Number(duration) || 1)) : [1];
 	const safeIndex = clamp(index, 0, safeDurations.length - 1);
 	const safeGap = Math.max(0, Number(gap) || 0);
 	let startDistance = Math.max(0, Number(startPadding) || 0);
@@ -1155,15 +1158,13 @@ function updateDiseaseScrolly(currentDesignY) {
 	const speechScrollDist = readDesignScrollY() - pinStart;
 
 	const diseaseSequenceEnd = pinDuration * transitionOutStart;
-	const diseaseSequenceConfig = isMobileLayout() ?
-		{
-			startPadding: 180,
-			gap: 160
-		} :
-		{
-			startPadding: 0,
-			gap: 160
-		};
+	const diseaseSequenceConfig = isMobileLayout() ? {
+		startPadding: 180,
+		gap: 160
+	} : {
+		startPadding: 0,
+		gap: 160
+	};
 
 	if (firstCard !== null) {
 		setHybridSpeechCardMotion(
@@ -1475,7 +1476,7 @@ function createVaccinePinLayer() {
 	content.appendChild(sourceCard);
 
 	const comparisonCard = makeVaccineCard(
-		"<span class=\"grey\">This data</span> compares the number of herpes zoster cases<span class=\"grey\"> and</span> serious adverse effects between the vaccine group and the placebo group<span class=\"grey\"> who did not receive the actual vaccine but were given a harmless substance.</span>",
+		"<span class=\"grey\">This data</span> compares the number of herpes zoster cases<span class=\"grey\"> and</span> serious adverse events between the vaccine group and the placebo group<span class=\"grey\"> who did not receive the actual vaccine but were given a harmless substance.</span>",
 		"vaccine-card-comparison"
 	);
 	content.appendChild(comparisonCard);
@@ -4541,7 +4542,10 @@ function buildPinnedPageLayer(def) {
 	});
 	layer.appendChild(content);
 	document.body.appendChild(layer);
-	def._elements = { layer, content };
+	def._elements = {
+		layer,
+		content
+	};
 }
 
 function revealPinnedChart(chart, p, layerOpacity) {
